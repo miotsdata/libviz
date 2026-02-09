@@ -6,6 +6,7 @@ class LibraryMetadata(Base):
     __tablename__ = "library_metadata"
 
     id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
     added_on = Column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
