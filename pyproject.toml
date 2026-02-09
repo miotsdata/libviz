@@ -1,0 +1,19 @@
+[project]
+name = "LibViz"
+version = "0.1.0"
+description = "App to visualize MS library spectra"
+authors = [
+    {name = "Matteo Miotto", email = "miotsdata@gmail.com"},
+]
+dependencies = []
+requires-python = ">=3.13"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[tool.pdm]
+distribution = true
