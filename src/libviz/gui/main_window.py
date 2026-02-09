@@ -18,6 +18,7 @@ class MainWindow(QMainWindow):
         # Connect menu actions
         self.ui.actionLoad_library.triggered.connect(lambda _: _)
         self.ui.actionCreate_library.triggered.connect(self.show_create_library)
+        self.ui.actionCreate_library_toolbar.triggered.connect(self.show_create_library)
 
         # ============== CREATE LIBRARY PAGE ==============
         # Connect buttons
@@ -50,6 +51,19 @@ class MainWindow(QMainWindow):
             self.ui.Home_page
         )
 
+    def show_library_page(self):
+        sender = self.sender()
+        if sender:
+            logger.debug("Clicked from %s", sender.objectName())
+        self.ui.stackedWidget.setCurrentWidget(
+            self.ui.Library_page
+        )
+        if self.loaded_library:
+            logger.debug("at least")
+            self.ui.libraryName_label.setText(f"Name: {self.loaded_library.name}")
+            self.ui.libraryNumberCompounds_label.setText(f"Number of compounds: {self.loaded_library.n_compounds}")
+            self.ui.libraryNumberSpectra_label.setText(f"Number of spectra: {self.loaded_library.n_spectra}")
+
 
     # ---------- UI actions ----------
     def browse_path(self):
@@ -76,7 +90,7 @@ class MainWindow(QMainWindow):
             self.ui.createLibraryError_frame.setVisible(True)
             return
         logger.debug("Libary '%s' saved as %s", name, path)
-
+        self.show_library_page()
 
     def _update_create_library_save_state(self):
         name_ok = bool(self.ui.createLibraryName_lineEdit.text().strip())

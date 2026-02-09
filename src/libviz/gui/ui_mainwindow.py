@@ -19,7 +19,7 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel,
     QLineEdit, QMainWindow, QMenu, QMenuBar,
     QPushButton, QSizePolicy, QSpacerItem, QStackedWidget,
-    QStatusBar, QVBoxLayout, QWidget)
+    QStatusBar, QToolBar, QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -30,6 +30,11 @@ class Ui_MainWindow(object):
         self.actionLoad_library.setObjectName(u"actionLoad_library")
         self.actionCreate_library = QAction(MainWindow)
         self.actionCreate_library.setObjectName(u"actionCreate_library")
+        self.actionCreate_library_toolbar = QAction(MainWindow)
+        self.actionCreate_library_toolbar.setObjectName(u"actionCreate_library_toolbar")
+        icon = QIcon(QIcon.fromTheme(u"document-new"))
+        self.actionCreate_library_toolbar.setIcon(icon)
+        self.actionCreate_library_toolbar.setMenuRole(QAction.MenuRole.NoRole)
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.verticalLayout_2 = QVBoxLayout(self.centralwidget)
@@ -124,6 +129,56 @@ class Ui_MainWindow(object):
         self.verticalLayout.addWidget(self.frame_2)
 
         self.stackedWidget.addWidget(self.CreateLibrary_page)
+        self.Library_page = QWidget()
+        self.Library_page.setObjectName(u"Library_page")
+        self.verticalLayout_4 = QVBoxLayout(self.Library_page)
+        self.verticalLayout_4.setObjectName(u"verticalLayout_4")
+        self.frame_6 = QFrame(self.Library_page)
+        self.frame_6.setObjectName(u"frame_6")
+        self.frame_6.setFrameShape(QFrame.Shape.StyledPanel)
+        self.frame_6.setFrameShadow(QFrame.Shadow.Raised)
+        self.horizontalLayout_5 = QHBoxLayout(self.frame_6)
+        self.horizontalLayout_5.setObjectName(u"horizontalLayout_5")
+        self.libraryName_label = QLabel(self.frame_6)
+        self.libraryName_label.setObjectName(u"libraryName_label")
+
+        self.horizontalLayout_5.addWidget(self.libraryName_label)
+
+        self.libraryNumberCompounds_label = QLabel(self.frame_6)
+        self.libraryNumberCompounds_label.setObjectName(u"libraryNumberCompounds_label")
+
+        self.horizontalLayout_5.addWidget(self.libraryNumberCompounds_label)
+
+        self.libraryNumberSpectra_label = QLabel(self.frame_6)
+        self.libraryNumberSpectra_label.setObjectName(u"libraryNumberSpectra_label")
+
+        self.horizontalLayout_5.addWidget(self.libraryNumberSpectra_label)
+
+
+        self.verticalLayout_4.addWidget(self.frame_6)
+
+        self.frame_5 = QFrame(self.Library_page)
+        self.frame_5.setObjectName(u"frame_5")
+        self.frame_5.setFrameShape(QFrame.Shape.StyledPanel)
+        self.frame_5.setFrameShadow(QFrame.Shadow.Raised)
+
+        self.verticalLayout_4.addWidget(self.frame_5)
+
+        self.frame_4 = QFrame(self.Library_page)
+        self.frame_4.setObjectName(u"frame_4")
+        self.frame_4.setFrameShape(QFrame.Shape.StyledPanel)
+        self.frame_4.setFrameShadow(QFrame.Shadow.Raised)
+
+        self.verticalLayout_4.addWidget(self.frame_4)
+
+        self.frame_3 = QFrame(self.Library_page)
+        self.frame_3.setObjectName(u"frame_3")
+        self.frame_3.setFrameShape(QFrame.Shape.StyledPanel)
+        self.frame_3.setFrameShadow(QFrame.Shadow.Raised)
+
+        self.verticalLayout_4.addWidget(self.frame_3)
+
+        self.stackedWidget.addWidget(self.Library_page)
         self.Home_page = QWidget()
         self.Home_page.setObjectName(u"Home_page")
         self.horizontalLayout_2 = QHBoxLayout(self.Home_page)
@@ -148,14 +203,18 @@ class Ui_MainWindow(object):
         self.statusbar = QStatusBar(MainWindow)
         self.statusbar.setObjectName(u"statusbar")
         MainWindow.setStatusBar(self.statusbar)
+        self.toolBar = QToolBar(MainWindow)
+        self.toolBar.setObjectName(u"toolBar")
+        MainWindow.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolBar)
 
         self.menubar.addAction(self.menuLibrary.menuAction())
         self.menuLibrary.addAction(self.actionLoad_library)
         self.menuLibrary.addAction(self.actionCreate_library)
+        self.toolBar.addAction(self.actionCreate_library_toolbar)
 
         self.retranslateUi(MainWindow)
 
-        self.stackedWidget.setCurrentIndex(0)
+        self.stackedWidget.setCurrentIndex(1)
 
 
         QMetaObject.connectSlotsByName(MainWindow)
@@ -165,12 +224,23 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
         self.actionLoad_library.setText(QCoreApplication.translate("MainWindow", u"Load library", None))
         self.actionCreate_library.setText(QCoreApplication.translate("MainWindow", u"Create library", None))
+        self.actionCreate_library_toolbar.setText(QCoreApplication.translate("MainWindow", u"Create library", None))
+#if QT_CONFIG(tooltip)
+        self.actionCreate_library_toolbar.setToolTip(QCoreApplication.translate("MainWindow", u"<html><head/><body><p>Create library</p></body></html>", None))
+#endif // QT_CONFIG(tooltip)
+#if QT_CONFIG(shortcut)
+        self.actionCreate_library_toolbar.setShortcut(QCoreApplication.translate("MainWindow", u"Backspace", None))
+#endif // QT_CONFIG(shortcut)
         self.label.setText(QCoreApplication.translate("MainWindow", u"Name", None))
         self.createLibraryBrowse_btn.setText(QCoreApplication.translate("MainWindow", u"Save as", None))
         self.createLibraryError_label.setText(QCoreApplication.translate("MainWindow", u"A file with this name already exists.", None))
         self.createLibraryCancel_btn.setText(QCoreApplication.translate("MainWindow", u"Cancel", None))
         self.createLibrarySave_btn.setText(QCoreApplication.translate("MainWindow", u"Next", None))
+        self.libraryName_label.setText(QCoreApplication.translate("MainWindow", u"Name: ", None))
+        self.libraryNumberCompounds_label.setText(QCoreApplication.translate("MainWindow", u"Number of compounds:", None))
+        self.libraryNumberSpectra_label.setText(QCoreApplication.translate("MainWindow", u"Number of spectra:", None))
         self.label_2.setText(QCoreApplication.translate("MainWindow", u"Welcome", None))
         self.menuLibrary.setTitle(QCoreApplication.translate("MainWindow", u"Library", None))
+        self.toolBar.setWindowTitle(QCoreApplication.translate("MainWindow", u"toolBar", None))
     # retranslateUi
 

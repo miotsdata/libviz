@@ -4,6 +4,8 @@ from sqlalchemy.orm import sessionmaker
 
 from libviz.chore.extensions import Base
 from libviz.chore.models import LibraryMetadata
+from libviz.chore.models.compound import Compound
+from libviz.chore.models.spectrum import Spectrum
 
 VERSION = "1"
 
@@ -14,6 +16,8 @@ class Library:
         self.engine = create_engine(f"sqlite:///{self.path}", future=True)
         self.Session = sessionmaker(bind=self.engine, future=True)
         self.session = None
+        self.n_compounds = 0
+        self.n_spectra = 0
 
     # ---------- lifecycle ----------
 
@@ -36,6 +40,8 @@ class Library:
             raise FileNotFoundError(self.path)
 
         self.session = self.Session()
+        self.n_compounds = self.session.query(Compound).count()
+        self.n_spectra = self.session.query(Spectrum).count()
         return self
 
     def close(self):
