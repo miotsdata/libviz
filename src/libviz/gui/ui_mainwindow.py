@@ -70,6 +70,10 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_3.addWidget(self.createLibraryPath_lineEdit)
 
+        self.horizontalSpacer_3 = QSpacerItem(20, 20, QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Minimum)
+
+        self.horizontalLayout_3.addItem(self.horizontalSpacer_3)
+
         self.createLibraryBrowse_btn = QPushButton(self.frame)
         self.createLibraryBrowse_btn.setObjectName(u"createLibraryBrowse_btn")
 
@@ -77,6 +81,23 @@ class Ui_MainWindow(object):
 
 
         self.verticalLayout.addWidget(self.frame)
+
+        self.createLibraryError_frame = QFrame(self.CreateLibrary_page)
+        self.createLibraryError_frame.setObjectName(u"createLibraryError_frame")
+        self.createLibraryError_frame.setEnabled(True)
+        self.createLibraryError_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        self.createLibraryError_frame.setFrameShadow(QFrame.Shadow.Raised)
+        self.verticalLayout_3 = QVBoxLayout(self.createLibraryError_frame)
+        self.verticalLayout_3.setObjectName(u"verticalLayout_3")
+        self.createLibraryError_label = QLabel(self.createLibraryError_frame)
+        self.createLibraryError_label.setObjectName(u"createLibraryError_label")
+        self.createLibraryError_label.setEnabled(True)
+        self.createLibraryError_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.verticalLayout_3.addWidget(self.createLibraryError_label)
+
+
+        self.verticalLayout.addWidget(self.createLibraryError_frame)
 
         self.frame_2 = QFrame(self.CreateLibrary_page)
         self.frame_2.setObjectName(u"frame_2")
@@ -146,6 +167,7 @@ class Ui_MainWindow(object):
         self.actionCreate_library.setText(QCoreApplication.translate("MainWindow", u"Create library", None))
         self.label.setText(QCoreApplication.translate("MainWindow", u"Name", None))
         self.createLibraryBrowse_btn.setText(QCoreApplication.translate("MainWindow", u"Save as", None))
+        self.createLibraryError_label.setText(QCoreApplication.translate("MainWindow", u"A file with this name already exists.", None))
         self.createLibraryCancel_btn.setText(QCoreApplication.translate("MainWindow", u"Cancel", None))
         self.createLibrarySave_btn.setText(QCoreApplication.translate("MainWindow", u"Next", None))
         self.label_2.setText(QCoreApplication.translate("MainWindow", u"Welcome", None))
