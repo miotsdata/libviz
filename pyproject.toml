@@ -22,4 +22,6 @@ distribution = true
 dev = [
     "pytest>=9.0.2",
     "pylint>=4.0.4",
+    "pyside6-stubs>=6.7.3.0",
+    "hupper>=1.12.1",
 ]

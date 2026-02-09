@@ -1,10 +1,8 @@
 import pytest
-from pathlib import Path
 from sqlalchemy import inspect
 
 from libviz.chore.services.library import Library
 from libviz.chore.models import LibraryMetadata
-from libviz.chore.extensions import Base
 
 VERSION = "1"
 
