@@ -35,14 +35,27 @@ class Library:
             )
             session.add(meta)
 
-    def load(self):
-        if not self.path.exists():
-            raise FileNotFoundError(self.path)
+    @classmethod
+    def load_from_db(cls, path: Path):
+        """Load a library from an existing database path."""
+        if not Path(path).exists():
+            raise FileNotFoundError(path)
 
-        self.session = self.Session()
-        self.n_compounds = self.session.query(Compound).count()
-        self.n_spectra = self.session.query(Spectrum).count()
-        return self
+        # We need the library name from the metadata
+        engine = create_engine(f"sqlite:///{path}", future=True)
+        Session = sessionmaker(bind=engine, future=True)
+        with Session() as session:
+            meta = session.query(LibraryMetadata).first()
+            if meta is None:
+                raise ValueError(f"No metadata found in library at {path}")
+            name = meta.name
+
+        # Create instance
+        lib = cls(name=name, path=path)
+        lib.session = lib.Session()
+        lib.n_compounds = lib.session.query(Compound).count()
+        lib.n_spectra = lib.session.query(Spectrum).count()
+        return lib
 
     def close(self):
         if self.session:

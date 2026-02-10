@@ -26,6 +26,10 @@ class LibraryService(QObject):
                 self._library.name, self._library.n_compounds, self._library.n_spectra
             )
 
+    @Slot()
+    def load(self, path: str):
+        self._library = Library.load_from_db(path=Path(path))
+
     @Property(str)
     def name(self):
         return self._library.name if self._library else ""

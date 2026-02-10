@@ -17,24 +17,55 @@ Page {
             Layout.alignment: Qt.AlignHCenter
         }
 
-        TextField { id: nameField; placeholderText: "Library name"; Layout.fillWidth: true }
+        TextField {
+            id: nameField
+            placeholderText: "Library name"
+            Layout.fillWidth: true
+        }
 
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
-            TextField { id: pathField; placeholderText: "Library path"; Layout.fillWidth: true }
+            TextField {
+                id: pathField
+                placeholderText: "Library path"
+                Layout.fillWidth: true
+            }
 
-            Button { text: "Browse..."; onClicked: pathField.text = createLibBackend.selectPath() }
+            Button {
+                text: "Browse..."
+                onClicked: pathField.text = createLibBackend.selectPath()
+            }
         }
 
-        Text { id: errorLabel; color: "red"; visible: false; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        Text {
+            id: errorLabel
+            color: "red"
+            visible: false
+            wrapMode: Text.Wrap
+            Layout.fillWidth: true
+        }
 
         Button {
             text: "Create"
             enabled: nameField.text !== "" && pathField.text !== ""
             Layout.alignment: Qt.AlignHCenter
             onClicked: createLibBackend.createLibrary(nameField.text, pathField.text)
+        }
+    }
+    // ---------- signal handling ----------
+    Connections {
+        target: createLibBackend
+
+        onErrorOccurred: {
+            errorLabel.text = message;
+            errorLabel.visible = true;
+        }
+
+        onSuccessOccurred: {
+            errorLabel.visible = false;
+            stack.push("LibraryHomePage.qml");
         }
     }
 }
