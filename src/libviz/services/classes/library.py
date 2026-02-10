@@ -1,11 +1,16 @@
 from pathlib import Path
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
+import numpy as np
+import logging
 
 from libviz.services.db.extensions import Base
-from libviz.services.db.models import LibraryMetadata
-from libviz.services.db.models.compound import Compound
-from libviz.services.db.models.spectrum import Spectrum
+from libviz.services.db.models import Compound, Spectrum, LibraryMetadata, SpectrumMetadata, PrecursorType
+from libviz.services.db.models.precursor_type import populate_precursor_types
+from libviz.services.db.models.spectrum import calculate_spectrum_hash
+from libviz.utils import parse_msp, calculate_exact_mass, infer_precursor_delta
+
+logger = logging.getLogger(__name__)
 
 VERSION = "1"
 
@@ -35,6 +40,9 @@ class Library:
             )
             session.add(meta)
 
+            populate_precursor_types(session)
+
+
     @classmethod
     def load_from_db(cls, path: Path):
         """Load a library from an existing database path."""
@@ -43,8 +51,8 @@ class Library:
 
         # We need the library name from the metadata
         engine = create_engine(f"sqlite:///{path}", future=True)
-        Session = sessionmaker(bind=engine, future=True)
-        with Session() as session:
+        session_made = sessionmaker(bind=engine, future=True)
+        with session_made() as session:
             meta = session.query(LibraryMetadata).first()
             if meta is None:
                 raise ValueError(f"No metadata found in library at {path}")
@@ -55,6 +63,43 @@ class Library:
         lib.session = lib.Session()
         lib.n_compounds = lib.session.query(Compound).count()
         lib.n_spectra = lib.session.query(Spectrum).count()
+        return lib
+
+    @classmethod
+    def loadFromMSP(cls, msp_path: str):
+        """
+        Load a library from an MSP file into an in-memory SQLite database.
+        Returns a Library instance.
+        """
+
+        # Create in-memory SQLite DB
+        engine = create_engine("sqlite:///:memory:", future=True)
+        session_maker = sessionmaker(bind=engine, future=True)
+        Base.metadata.create_all(engine)  # create tables
+
+        session = session_maker()
+
+        # Create metadata entry
+        meta = LibraryMetadata(name="In-memory MSP Library", created_version=VERSION, actual_version=VERSION)
+        session.add(meta)
+        session.commit()
+
+        populate_precursor_types(session)
+
+        # Parse MSP file
+        parse_msp_generator = parse_msp(msp_path)
+
+        for compound_data in parse_msp_generator:
+            cls._insert_msp_entry(session, compound_data)
+
+        # Create Library instance
+        lib = cls(name=None, path=None)
+        lib.engine = engine
+        lib.Session = session_maker
+        lib.session = session
+        lib.n_compounds = session.query(Compound).count()
+        lib.n_spectra = session.query(Spectrum).count()
+
         return lib
 
     def close(self):
@@ -87,3 +132,98 @@ class Library:
 
     def is_valid(self) -> bool:
         return self.path.exists()
+
+    @staticmethod
+    def _insert_msp_entry(session: Session, entry):
+        # ---------- prepare mz/intensity ----------
+        mz = np.array([float(m) for m, _ in entry.get("peaks", [])], dtype=np.float32)
+        intensity = np.array([float(i) for _, i in entry.get("peaks", [])], dtype=np.float32)
+
+        # sort to make hash deterministic
+        order = np.argsort(mz)
+        mz = mz[order]
+        intensity = intensity[order]
+
+        spectrum_hash = calculate_spectrum_hash(mz, intensity)
+
+        # ---------- precursor type ----------
+        precursortype_formula = entry.get("PRECURSORTYPE")
+        precursortype = session.query(PrecursorType).filter_by(
+            formula=precursortype_formula
+        ).one_or_none()
+
+        if precursortype is None:
+            try:
+                charge, delta = infer_precursor_delta(precursortype_formula)
+            except ValueError:
+                # Skip unusual precursors
+                logger.warning("Skipping precursor: %s", precursortype_formula)
+                return
+            precursortype = PrecursorType(
+                formula=precursortype_formula,
+                delta_mass=delta,
+                charge=charge
+            )
+            session.add(precursortype)
+            session.flush()
+
+        # ---------- check if spectrum already exists ----------
+        existing = session.query(Spectrum).filter_by(
+            precursor_type_id=precursortype.id,
+            polarity=entry.get("IONMODE"),
+            collision_energy = float(entry.get("COLLISIONENERGY") or 0.0),
+            spectrum_hash=spectrum_hash
+        ).one_or_none()
+
+        if existing:
+            # spectrum already in DB → skip everything
+            return existing
+
+        # ---------- compound ----------
+        inchikey = entry.get("INCHIKEY")
+        compound = None
+        if inchikey:
+            compound = session.query(Compound).filter_by(inchikey=inchikey).one_or_none()
+
+        if compound is None:
+            compound = Compound(
+                name=entry.get("NAME"),
+                formula=entry.get("FORMULA"),
+                inchikey=inchikey,
+                exact_mass=float(entry["EXACTMASS"]) if "EXACTMASS" in entry else calculate_exact_mass(entry.get("FORMULA")),
+            )
+            session.add(compound)
+            session.flush()  # get compound.id
+
+        # ---------- peaks / spectrum ----------
+        spectrum = Spectrum.from_arrays(
+            compound_id=compound.id,
+            precursor_mz=float(entry["PRECURSORMZ"]),
+            precursor_type_id=precursortype.id,
+            polarity=entry.get("IONMODE"),
+            collision_energy=float(entry.get("COLLISIONENERGY") or 0.0),
+            mz=mz,
+            intensity=intensity,
+        )
+
+        session.add(spectrum)
+        session.flush()
+
+        # ---------- spectrum metadata ----------
+        known_keys = {
+            "NAME", "FORMULA", "INCHIKEY", "EXACTMASS",
+            "PRECURSORMZ", "PRECURSORTYPE",
+            "IONMODE", "COLLISIONENERGY", "peaks"
+        }
+
+        for key, value in entry.items():
+            if key not in known_keys:
+                session.add(
+                    SpectrumMetadata(
+                        spectrum_id=spectrum.id,
+                        key=key,
+                        value=str(value)
+                    )
+                )
+
+        return spectrum
