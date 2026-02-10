@@ -4,7 +4,7 @@ import numpy as np
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, LargeBinary, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 
-from libviz.chore.extensions import Base
+from libviz.services.db.extensions import Base
 
 class Spectrum(Base):
     __tablename__ = "spectrum"

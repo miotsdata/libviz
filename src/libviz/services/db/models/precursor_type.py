@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float
 from sqlalchemy.orm import relationship
 
-from libviz.chore.extensions import Base
+from libviz.services.db.extensions import Base
 
 class PrecursorType(Base):
     __tablename__ = "precursor_type"

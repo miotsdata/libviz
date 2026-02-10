@@ -5,7 +5,7 @@ description = "App to visualize MS library spectra"
 authors = [
     {name = "Matteo Miotto", email = "miotsdata@gmail.com"},
 ]
-dependencies = ["sqlalchemy>=2.0.46", "pyside6>=6.10.2", "pyqt6>=6.10.2", "alembic>=1.18.3", "pandas>=3.0.0", "numpy>=2.4.2"]
+dependencies = ["sqlalchemy>=2.0.46", "pyside6>=6.10.2", "pyqt6>=6.10.2", "alembic>=1.18.3", "pandas>=3.0.0", "numpy>=2.4.2", "PySide6-Essentials>=6.10.2"]
 requires-python = "==3.13"
 readme = "README.md"
 license = {text = "MIT"}

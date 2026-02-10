@@ -2,16 +2,16 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from libviz.chore.extensions import Base
-from libviz.chore.models import LibraryMetadata
-from libviz.chore.models.compound import Compound
-from libviz.chore.models.spectrum import Spectrum
+from libviz.services.db.extensions import Base
+from libviz.services.db.models import LibraryMetadata
+from libviz.services.db.models.compound import Compound
+from libviz.services.db.models.spectrum import Spectrum
 
 VERSION = "1"
 
 class Library:
     def __init__(self, name: str, path: Path):
-        self.path = Path(path)
+        self.path = path
         self.name = name
         self.engine = create_engine(f"sqlite:///{self.path}", future=True)
         self.Session = sessionmaker(bind=self.engine, future=True)

@@ -1,1 +1,1 @@
-from .library import Library
+from .library_service import LibraryService

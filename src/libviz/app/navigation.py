@@ -5,6 +5,7 @@ class Navigation(QObject):
     goHome = Signal()
     goCreateLibrary = Signal()
     goLoadLibrary = Signal()
+    goLibraryHomePage = Signal()
 
     @Slot()
     def show_home(self):
@@ -17,3 +18,7 @@ class Navigation(QObject):
     @Slot()
     def show_load_library(self):
         self.goLoadLibrary.emit()
+
+    @Slot()
+    def show_library_page(self):
+        self.goLibraryHomePage.emit()

@@ -1,16 +1,18 @@
 
 import sys
 from pathlib import Path
-from PySide6.QtGui import QGuiApplication # pylint: disable=no-name-in-module
+from PySide6.QtWidgets import QApplication # pylint: disable=no-name-in-module
 from PySide6.QtQml import QQmlApplicationEngine # pylint: disable=no-name-in-module
 from PySide6.QtCore import QUrl # pylint: disable=no-name-in-module
 
 from libviz.app import AppState, Navigation
 from libviz.utils import configure_logging
+from libviz.backends.create_library_backend import CreateLibraryBackend
+from libviz.services import LibraryService
 
 def main():
     configure_logging()
-    app = QGuiApplication(sys.argv)
+    app = QApplication(sys.argv)
     engine = QQmlApplicationEngine()
 
     app_state = AppState()
@@ -18,6 +20,17 @@ def main():
 
     engine.rootContext().setContextProperty("appState", app_state)
     engine.rootContext().setContextProperty("nav", navigation)
+
+    # Create library service + backend
+    library_service = LibraryService()
+    create_library_backend = CreateLibraryBackend(library_service)
+
+    # Expose backend to QML
+    engine.rootContext().setContextProperty(
+        "createLibBackend",
+        create_library_backend
+    )
+    engine.rootContext().setContextProperty("libraryService", library_service)
 
     qml_dir = Path(__file__).parent / "qml"
     main_qml = qml_dir / "main.qml"
