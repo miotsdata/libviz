@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
+import "utils"
 
 Page {
     id: libraryPage
@@ -30,6 +31,11 @@ Page {
                 text: "Home"
                 onClicked: nav.show_home()
             }
+        }
+
+        libraryMetabolitesTable {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
         }
     }
 }

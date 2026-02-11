@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QFileDialog # pylint: disable=no-name-in-module
 
 import logging
 
+from libviz.services.QModel.metabolite_model import CompoundTableModel
 from libviz.services.library_service import LibraryService
 
 logger = logging.getLogger(__name__)
@@ -12,11 +13,12 @@ class LoadLibraryBackend(QObject):
     errorOccurred = Signal(str)
     successOccurred = Signal()
 
-    def __init__(self, library_service):
+    def __init__(self, library_service, engine):
         super().__init__()
         self._library_service: LibraryService = library_service
         self._thread = None
         self._worker = None
+        self._engine = engine
 
 
     @Slot(str)
@@ -68,6 +70,7 @@ class LoadLibraryBackend(QObject):
 
     def _on_success(self):
         logger.info("Library successfully loaded")
+        self._create_and_expose_model()
         self.successOccurred.emit()
 
 
@@ -95,6 +98,13 @@ class LoadLibraryBackend(QObject):
             "MSP Files (*.msp)"
         )
         return path or ""
+    
+    def _create_and_expose_model(self):
+        compound_model = CompoundTableModel(self._library_service._library)
+        self._engine.rootContext().setContextProperty(
+            "compoundModel",
+            compound_model
+        )
 
 class LoadFromMspWorker(QObject):
     finished = Signal()
@@ -117,3 +127,4 @@ class LoadFromMspWorker(QObject):
             return
 
         self.finished.emit()
+

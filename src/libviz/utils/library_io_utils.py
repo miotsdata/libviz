@@ -32,4 +32,3 @@ def _parse_entry(lines):
         data["peaks"] = peaks
 
     return data
-

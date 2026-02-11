@@ -3,6 +3,8 @@ from PySide6.QtWidgets import QFileDialog # pylint: disable=no-name-in-module
 
 import logging
 
+from libviz.services.library_service import LibraryService
+
 logger = logging.getLogger(__name__)
 
 class CreateLibraryBackend(QObject):
@@ -11,7 +13,7 @@ class CreateLibraryBackend(QObject):
 
     def __init__(self, library_service):
         super().__init__()
-        self._library_service = library_service
+        self._library_service: LibraryService = library_service
 
     @Slot(str, str)
     def createLibrary(self, name: str, path: str):

@@ -1,0 +1,1 @@
+from .metabolite_model import CompoundTableModel

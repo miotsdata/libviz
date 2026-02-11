@@ -28,13 +28,15 @@ def main():
     # Create library service + backend
     library_service = LibraryService()
     create_library_backend = CreateLibraryBackend(library_service)
-    load_library_backend = LoadLibraryBackend(library_service)
+    load_library_backend = LoadLibraryBackend(library_service, engine)
+    compound_model = None
 
     # Expose backend to QML
     engine.rootContext().setContextProperty("createLibBackend", create_library_backend)
     engine.rootContext().setContextProperty("loadLibBackend", load_library_backend)
 
     engine.rootContext().setContextProperty("libraryService", library_service)
+    engine.rootContext().setContextProperty("compoundModel", compound_model)
 
     qml_dir = Path(__file__).parent / "qml"
     main_qml = qml_dir / "main.qml"

@@ -29,7 +29,7 @@ class LibraryService(QObject):
     @Slot()
     def load(self, path: str):
         self._library = Library.load_from_db(path=Path(path))
-    
+
     @Slot()
     def loadFromMSP(self, path: str):
         self._library = Library.loadFromMSP(path)
@@ -48,4 +48,3 @@ class LibraryService(QObject):
     @Property(int, notify=libraryChanged)
     def n_spectra(self):
         return self._library.n_spectra if self._library else 0
-

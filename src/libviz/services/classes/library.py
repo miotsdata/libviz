@@ -3,6 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 import numpy as np
 import logging
+import tempfile
 
 from libviz.services.db.extensions import Base
 from libviz.services.db.models import Compound, Spectrum, LibraryMetadata, SpectrumMetadata, PrecursorType
@@ -20,7 +21,6 @@ class Library:
         self.name = name
         self.engine = create_engine(f"sqlite:///{self.path}", future=True)
         self.Session = sessionmaker(bind=self.engine, future=True)
-        self.session = None
         self.n_compounds = 0
         self.n_spectra = 0
 
@@ -60,9 +60,9 @@ class Library:
 
         # Create instance
         lib = cls(name=name, path=path)
-        lib.session = lib.Session()
-        lib.n_compounds = lib.session.query(Compound).count()
-        lib.n_spectra = lib.session.query(Spectrum).count()
+        session = lib.Session()
+        lib.n_compounds = session.query(Compound).count()
+        lib.n_spectra = session.query(Spectrum).count()
         return lib
 
     @classmethod
@@ -73,11 +73,27 @@ class Library:
         """
 
         # Create in-memory SQLite DB
-        engine = create_engine("sqlite:///:memory:", future=True)
-        session_maker = sessionmaker(bind=engine, future=True)
+        # Create temporary DB file
+        tmp_file = tempfile.NamedTemporaryFile(
+            suffix=".db",
+            delete=False
+        )
+        tmp_file.close()
+
+        db_path = tmp_file.name
+
+        engine = create_engine(
+            f"sqlite:///{db_path}",
+            future=True
+        )
+
+        Session_db = sessionmaker(
+            bind=engine,
+            expire_on_commit=False
+        )
         Base.metadata.create_all(engine)  # create tables
 
-        session = session_maker()
+        session = Session_db()
 
         # Create metadata entry
         meta = LibraryMetadata(name="In-memory MSP Library", created_version=VERSION, actual_version=VERSION)
@@ -89,23 +105,22 @@ class Library:
         # Parse MSP file
         parse_msp_generator = parse_msp(msp_path)
 
-        for compound_data in parse_msp_generator:
+        for i, compound_data in enumerate(parse_msp_generator, 1):
             cls._insert_msp_entry(session, compound_data)
+            if i % 500 == 0:
+                session.commit()
+        session.commit()
 
         # Create Library instance
-        lib = cls(name="NONAME", path=None)
+        lib = cls(name="NONAME", path=db_path)
         lib.engine = engine
-        lib.Session = session_maker
-        lib.session = session
+        lib.Session = Session_db
         lib.n_compounds = session.query(Compound).count()
         lib.n_spectra = session.query(Spectrum).count()
 
-        return lib
+        session.close()
 
-    def close(self):
-        if self.session:
-            self.session.close()
-            self.session = None
+        return lib
 
     # ---------- session handling ----------
 
