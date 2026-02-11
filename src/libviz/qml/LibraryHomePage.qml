@@ -3,17 +3,21 @@ import QtQuick.Controls 2.15
 
 Page {
     id: libraryPage
-    property string libraryName: ""
-    property int numCompounds: 0
-    property int numSpectra: 0
 
     Column {
         spacing: 10
         anchors.centerIn: parent
 
-        Text { text: "Library: " + libraryName; font.pointSize: 18 }
-        Text { text: "Compounds: " + numCompounds }
-        Text { text: "Spectra: " + numSpectra }
+        Text {
+            text: "Library: " + libraryService.name
+            font.pointSize: 18
+        }
+        Text {
+            text: "Compounds: " + libraryService.n_compounds
+        }
+        Text {
+            text: "Spectra: " + libraryService.n_spectra
+        }
 
         Row {
             spacing: 10
@@ -26,15 +30,6 @@ Page {
                 text: "Home"
                 onClicked: nav.show_home()
             }
-        }
-    }
-
-    Connections {
-        target: libraryService
-        function onLibraryChanged() {
-            libraryName = name
-            numCompounds = compounds
-            numSpectra = spectra
         }
     }
 }

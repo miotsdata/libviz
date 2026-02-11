@@ -93,7 +93,7 @@ class Library:
             cls._insert_msp_entry(session, compound_data)
 
         # Create Library instance
-        lib = cls(name=None, path=None)
+        lib = cls(name="NONAME", path=None)
         lib.engine = engine
         lib.Session = session_maker
         lib.session = session

@@ -29,15 +29,23 @@ class LibraryService(QObject):
     @Slot()
     def load(self, path: str):
         self._library = Library.load_from_db(path=Path(path))
+    
+    @Slot()
+    def loadFromMSP(self, path: str):
+        self._library = Library.loadFromMSP(path)
+        self.libraryChanged.emit(
+                self._library.name, self._library.n_compounds, self._library.n_spectra
+            )
 
-    @Property(str)
+    @Property(str, notify=libraryChanged)
     def name(self):
         return self._library.name if self._library else ""
 
-    @Property(int)
+    @Property(int, notify=libraryChanged)
     def n_compounds(self):
         return self._library.n_compounds if self._library else 0
 
-    @Property(int)
+    @Property(int, notify=libraryChanged)
     def n_spectra(self):
         return self._library.n_spectra if self._library else 0
+
