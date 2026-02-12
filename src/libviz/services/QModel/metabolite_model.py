@@ -14,7 +14,7 @@ class CompoundTableModel(QAbstractTableModel):
         self._headers = ["Name", "Formula", "InChIKey", "Exact Mass", "Added On"]
 
         # Load initial data (all compounds, can later optimize for lazy loading)
-        self._data = self.load_compounds()
+        self._data = []
 
     def load_compounds(self):
         session = self.library.Session()
@@ -29,6 +29,7 @@ class CompoundTableModel(QAbstractTableModel):
         return len(self._headers)
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        print("Loading data")
         if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
             return None
 
@@ -65,3 +66,8 @@ class CompoundTableModel(QAbstractTableModel):
 
         self._data.sort(key=key_map[column], reverse=reverse)
         self.layoutChanged.emit()
+
+    def roleNames(self):
+        return {
+            Qt.ItemDataRole.DisplayRole: b"display"
+        }

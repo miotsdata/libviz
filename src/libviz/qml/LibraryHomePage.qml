@@ -1,11 +1,13 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import "utils"
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+//import "utils"
 
 Page {
     id: libraryPage
 
-    Column {
+    ColumnLayout {
         spacing: 10
         anchors.centerIn: parent
 
@@ -33,9 +35,41 @@ Page {
             }
         }
 
-        libraryMetabolitesTable {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+        ScrollView {
+            
+            TableView {
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredWidth: 300
+                Layout.preferredHeight: 300
+
+                model: compoundModel
+                delegate: TableViewDelegate {
+                }
+
+                Component.onCompleted: {
+                    console.log("Init done");
+                }
+            }
         }
+
+        // TableView {
+        //     id: table
+        //     Layout.fillWidth: true
+        //     Layout.fillHeight: true
+
+        //     // Only bind if model exists
+        //     model: compoundModel !== undefined ? compoundModel : null
+        //     visible: compoundModel !== undefined
+
+        //     // headerVisible: true
+        //     // sortIndicatorVisible: true
+        // }
+
+        // libraryMetabolitesTable {
+        //     Layout.fillWidth: true
+        //     Layout.fillHeight: true
+        // }
     }
 }

@@ -7,27 +7,27 @@ TableView {
     model: compoundModel !== undefined ? compoundModel : null
     visible: compoundModel !== undefined
 
-    TableViewColumn {
+    TableModelColumn {
         role: "Name"
         title: "Name"
         width: 200
     }
-    TableViewColumn {
+    TableModelColumn {
         role: "Formula"
         title: "Formula"
         width: 120
     }
-    TableViewColumn {
+    TableModelColumn {
         role: "InChIKey"
         title: "InChIKey"
         width: 180
     }
-    TableViewColumn {
+    TableModelColumn {
         role: "Exact Mass"
         title: "Exact Mass"
         width: 100
     }
-    TableViewColumn {
+    TableModelColumn {
         role: "Added On"
         title: "Added On"
         width: 150

@@ -13,6 +13,7 @@ ApplicationWindow {
     // =========================
     // MENU BAR
     // =========================
+
     menuBar: MenuBar {
         Menu {
             title: "Library"
@@ -46,7 +47,7 @@ ApplicationWindow {
             id: stack
             Layout.fillWidth: true
             Layout.fillHeight: true
-            initialItem: HomePage {}
+            initialItem: HomePage2 {}
         }
 
         // -------- Status bar --------
@@ -71,7 +72,7 @@ ApplicationWindow {
 
                 ProgressBar {
                     id: progressBar
-                    width: 300
+                    width: 200
                     height: 20
                     indeterminate: true
                     from: 0
