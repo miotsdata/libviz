@@ -18,7 +18,6 @@ class LoadLibraryBackend(QObject):
         self._library_service: LibraryService = library_service
         self._thread = None
         self._worker = None
-        self._engine = engine
 
 
     @Slot(str)
@@ -70,7 +69,6 @@ class LoadLibraryBackend(QObject):
 
     def _on_success(self):
         logger.info("Library successfully loaded")
-        self._create_and_expose_model()
         self.successOccurred.emit()
 
 
@@ -98,13 +96,6 @@ class LoadLibraryBackend(QObject):
             "MSP Files (*.msp)"
         )
         return path or ""
-    
-    def _create_and_expose_model(self):
-        compound_model = CompoundTableModel(self._library_service._library)
-        self._engine.rootContext().setContextProperty(
-            "compoundModel",
-            compound_model
-        )
 
 class LoadFromMspWorker(QObject):
     finished = Signal()

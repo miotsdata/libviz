@@ -20,9 +20,15 @@ def main():
     QQuickStyle.setStyle("Material")
     mock_model = MockCompoundTableModel()
     qmlRegisterSingletonInstance(MockCompoundTableModel, "Metabolomics.Models", 1, 0, "MockCompoundTableModel", mock_model)
+    
+    library_service = LibraryService()
+    create_library_backend = CreateLibraryBackend(library_service)
+    compound_model = CompoundTableModel(library_service)
+
+    qmlRegisterSingletonInstance(CompoundTableModel, "Metabolomics.Models", 1, 0, "CompoundTableModel", compound_model)
 
     engine = QQmlApplicationEngine()
-
+    load_library_backend = LoadLibraryBackend(library_service, engine)
     app_state = AppState()
     navigation = Navigation()
 
@@ -30,12 +36,6 @@ def main():
     engine.rootContext().setContextProperty("nav", navigation)
 
     # Create library service + backend
-    library_service = LibraryService()
-    create_library_backend = CreateLibraryBackend(library_service)
-    load_library_backend = LoadLibraryBackend(library_service, engine)
-    compound_model = CompoundTableModel(library_service._library)
-
-
     # Expose backend to QML
     engine.rootContext().setContextProperty("createLibBackend", create_library_backend)
     engine.rootContext().setContextProperty("loadLibBackend", load_library_backend)

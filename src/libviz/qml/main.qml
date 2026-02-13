@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Metabolomics.Models 1.0
 
 ApplicationWindow {
     id: window
@@ -47,7 +48,7 @@ ApplicationWindow {
             id: stack
             Layout.fillWidth: true
             Layout.fillHeight: true
-            initialItem: HomePage2 {}
+            initialItem: HomePage {}
         }
 
         // -------- Status bar --------
@@ -116,6 +117,8 @@ ApplicationWindow {
         function onSuccessOccurred() {
             statusBar.visible = false;
             statusText.text = "";
+            console.log("SUCCESS SIGNAL RECEIVED");
+            CompoundTableModel.load_compounds();
             nav.show_library_page();
         }
 

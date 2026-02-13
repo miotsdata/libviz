@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-
+import Metabolomics.Models 1.0
 //import "utils"
 
 Page {
@@ -44,7 +44,7 @@ Page {
                 Layout.preferredWidth: 300
                 Layout.preferredHeight: 300
 
-                model: compoundModel
+                model: CompoundTableModel
                 delegate: TableViewDelegate {
                 }
 

@@ -1,26 +1,45 @@
-from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex # pylint: disable=no-name-in-module
+from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex, Slot # pylint: disable=no-name-in-module
+from PySide6.QtQml import QmlElement, QmlSingleton # pylint: disable=no-name-in-module
 from sqlalchemy import select
 
 from libviz.services.classes.library import Library
 from libviz.services.db.models.compound import Compound
 
+"""
+QML_IMPORT_NAME = "compoundModel"
+QML_IMPORT_MAJOR_VERSION = 1
+
+@QmlElement
+"""
 class CompoundTableModel(QAbstractTableModel):
-    def __init__(self, library, parent=None):
+
+    def __init__(self, library_service, parent=None):
         """
         library: instance of your Library class
         """
         super().__init__(parent)
-        self.library: Library = library
+        self.library_service = library_service
+        self.library: Library = None
         self._headers = ["Name", "Formula", "InChIKey", "Exact Mass", "Added On"]
 
         # Load initial data (all compounds, can later optimize for lazy loading)
         self._data = []
+        print("CompoundTableModel INIT", id(self))
 
+    @Slot()
     def load_compounds(self):
+        self.library = self.library_service._library
+        print("LOAD CALLED", id(self))
+        print("Loading compounds...")
         session = self.library.Session()
-        stmt = select(Compound)
+        stmt = select(Compound).limit(5)
         results = session.execute(stmt).scalars().all()
-        return results
+        
+        self.beginResetModel()
+        self._data = results
+        self.endResetModel()
+        print("Finished")
+        print(f"N compounds: {len(self._data)}")
 
     def rowCount(self, parent=QModelIndex()):
         return len(self._data)
@@ -51,7 +70,13 @@ class CompoundTableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Horizontal:
             return self._headers[section]
         return None
+    
+    def roleNames(self):
+        return {
+            Qt.ItemDataRole.DisplayRole: b"display"
+        }
 
+    """
     def sort(self, column, order):
         self.layoutAboutToBeChanged.emit()
         reverse = order == Qt.DescendingOrder
@@ -66,8 +91,7 @@ class CompoundTableModel(QAbstractTableModel):
 
         self._data.sort(key=key_map[column], reverse=reverse)
         self.layoutChanged.emit()
+    """
 
-    def roleNames(self):
-        return {
-            Qt.ItemDataRole.DisplayRole: b"display"
-        }
+
+
