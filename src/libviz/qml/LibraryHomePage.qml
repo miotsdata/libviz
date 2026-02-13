@@ -7,69 +7,79 @@ import Metabolomics.Models 1.0
 Page {
     id: libraryPage
 
+    property var headers: [
+        { title: "Name", role: "name", width: 180 },
+        { title: "Formula", role: "formula", width: 120 },
+        { title: "InChIKey", role: "inchikey", width: 240 },
+        { title: "Exact Mass", role: "exact_mass", width: 120 },
+        { title: "Added On", role: "added_on", width: 180 }
+    ]
+
     ColumnLayout {
+        anchors.fill: parent
         spacing: 10
-        anchors.centerIn: parent
 
-        Text {
-            text: "Library: " + libraryService.name
-            font.pointSize: 18
-        }
-        Text {
-            text: "Compounds: " + libraryService.n_compounds
-        }
-        Text {
-            text: "Spectra: " + libraryService.n_spectra
-        }
+        // --- Info ---
+        Text { text: "Library: " + libraryService.name }
+        Text { text: "Compounds: " + libraryService.n_compounds }
+        Text { text: "Spectra: " + libraryService.n_spectra }
 
-        Row {
-            spacing: 10
-            Button {
-                text: "Refresh"
-                onClicked: libraryService.refresh_library()
-            }
+        // --- Header ---
+        RowLayout {
+            height: 20
+            spacing: 0
 
-            Button {
-                text: "Home"
-                onClicked: nav.show_home()
-            }
-        }
+            Repeater {
+                model: headers
 
-        ScrollView {
-            
-            TableView {
+                Rectangle {
+                    Layout.preferredWidth: modelData.width
+                    Layout.fillHeight: false
+                    color: "#e8eaf0"
+                    border.color: "#c5c9d3"
 
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredWidth: 300
-                Layout.preferredHeight: 300
-
-                model: CompoundTableModel
-                delegate: TableViewDelegate {
-                }
-
-                Component.onCompleted: {
-                    console.log("Init done");
+                    Text {
+                        anchors.centerIn: parent
+                        text: modelData.title
+                        font.bold: true
+                    }
                 }
             }
         }
 
-        // TableView {
-        //     id: table
-        //     Layout.fillWidth: true
-        //     Layout.fillHeight: true
+        // --- Table ---
+        TableView {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 36 * 5
+            clip: true
 
-        //     // Only bind if model exists
-        //     model: compoundModel !== undefined ? compoundModel : null
-        //     visible: compoundModel !== undefined
+            model: CompoundTableModel
 
-        //     // headerVisible: true
-        //     // sortIndicatorVisible: true
-        // }
+            delegate: Rectangle {
+                implicitWidth: headers[column].width
+                implicitHeight: 36
 
-        // libraryMetabolitesTable {
-        //     Layout.fillWidth: true
-        //     Layout.fillHeight: true
-        // }
+                color: row % 2 === 0 ? "#ffffff" : "#f7f9fc"
+                border.color: "#e0e4ec"
+
+                property string roleName: headers[column].role
+
+                Text {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                    text: model[roleName] || ""
+                }
+            }
+
+            ScrollBar.vertical: ScrollBar {}
+        }
+
+        Item {
+            Layout.fillHeight: true
+        }
+
+        
     }
 }

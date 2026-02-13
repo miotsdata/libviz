@@ -38,10 +38,10 @@ def infer_precursor_delta(name: str) -> tuple[int, float]:
     return charge, delta
 
 
-def calculate_exact_mass(formula: str) -> float | None:
+def calculate_exact_mass(formula: str, n_decimals: int = 4) -> float | None:
     if not formula:
         return None
     try:
-        return calculate_mass(formula=formula)
+        return round(calculate_mass(formula=formula), n_decimals)
     except Exception:
         return None

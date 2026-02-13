@@ -1,17 +1,16 @@
 from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex, Slot # pylint: disable=no-name-in-module
-from PySide6.QtQml import QmlElement, QmlSingleton # pylint: disable=no-name-in-module
 from sqlalchemy import select
 
 from libviz.services.classes.library import Library
 from libviz.services.db.models.compound import Compound
 
-"""
-QML_IMPORT_NAME = "compoundModel"
-QML_IMPORT_MAJOR_VERSION = 1
-
-@QmlElement
-"""
 class CompoundTableModel(QAbstractTableModel):
+
+    NameRole = Qt.ItemDataRole.UserRole + 1
+    FormulaRole = Qt.ItemDataRole.UserRole + 2
+    InChIKeyRole = Qt.ItemDataRole.UserRole + 3
+    ExactMassRole = Qt.ItemDataRole.UserRole + 4
+    AddedOnRole = Qt.ItemDataRole.UserRole + 5
 
     def __init__(self, library_service, parent=None):
         """
@@ -32,7 +31,7 @@ class CompoundTableModel(QAbstractTableModel):
         print("LOAD CALLED", id(self))
         print("Loading compounds...")
         session = self.library.Session()
-        stmt = select(Compound).limit(5)
+        stmt = select(Compound).limit(20)
         results = session.execute(stmt).scalars().all()
         
         self.beginResetModel()
@@ -47,24 +46,25 @@ class CompoundTableModel(QAbstractTableModel):
     def columnCount(self, parent=QModelIndex()):
         return len(self._headers)
 
-    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
-        print("Loading data")
-        if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
+    def data(self, index, role):
+        if not index.isValid():
             return None
 
         compound = self._data[index.row()]
-        column = index.column()
-        if column == 0:
+
+        if role == self.NameRole:
             return compound.name
-        elif column == 1:
+        elif role == self.FormulaRole:
             return compound.formula
-        elif column == 2:
+        elif role == self.InChIKeyRole:
             return compound.inchikey
-        elif column == 3:
-            return str(compound.exact_mass)
-        elif column == 4:
+        elif role == self.ExactMassRole:
+            return compound.exact_mass
+        elif role == self.AddedOnRole:
             return compound.added_on.strftime("%Y-%m-%d %H:%M:%S")
+
         return None
+
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Horizontal:
@@ -73,7 +73,11 @@ class CompoundTableModel(QAbstractTableModel):
     
     def roleNames(self):
         return {
-            Qt.ItemDataRole.DisplayRole: b"display"
+            self.NameRole: b"name",
+            self.FormulaRole: b"formula",
+            self.InChIKeyRole: b"inchikey",
+            self.ExactMassRole: b"exact_mass",
+            self.AddedOnRole: b"added_on",
         }
 
     """
