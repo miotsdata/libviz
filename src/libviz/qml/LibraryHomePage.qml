@@ -2,84 +2,161 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Metabolomics.Models 1.0
-//import "utils"
 
 Page {
-    id: libraryPage
+    id: testessdhfgaslhbmas
+    anchors.fill: parent
 
-    property var headers: [
-        { title: "Name", role: "name", width: 180 },
-        { title: "Formula", role: "formula", width: 120 },
-        { title: "InChIKey", role: "inchikey", width: 240 },
-        { title: "Exact Mass", role: "exact_mass", width: 120 },
-        { title: "Added On", role: "added_on", width: 180 }
-    ]
-
-    ColumnLayout {
+    ColumnLayout{
         anchors.fill: parent
-        spacing: 10
 
-        // --- Info ---
-        Text { text: "Library: " + libraryService.name }
-        Text { text: "Compounds: " + libraryService.n_compounds }
-        Text { text: "Spectra: " + libraryService.n_spectra }
-
-        // --- Header ---
         RowLayout {
-            height: 20
-            spacing: 0
+            height: window.height / 10
+            Layout.fillWidth: true
+            Text { text: "Library: " + libraryService.name }
+            Text { text: "Compounds: " + libraryService.n_compounds }
+            Text { text: "Spectra: " + libraryService.n_spectra }
+        }
 
-            Repeater {
-                model: headers
+        RowLayout {
 
-                Rectangle {
-                    Layout.preferredWidth: modelData.width
-                    Layout.fillHeight: false
-                    color: "#e8eaf0"
-                    border.color: "#c5c9d3"
+            Rectangle {
+                width: window.width / 3
+                Layout.fillHeight: true
+                color: "blue"
+            }
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: modelData.title
-                        font.bold: true
+            ColumnLayout {
+                Layout.fillWidth: true
+
+                TextField {
+                    placeholderText: "Filter by name..."
+                    onTextChanged: CompoundTableModel.setFilter(text)
+                }
+
+                ListModel {
+                    id: headerModel
+                    ListElement { label: "ID"; column: 0 }
+                    ListElement { label: "Name"; column: 1 }
+                    ListElement { label: "Formula"; column: 2 }
+                    ListElement { label: "Exact Mass"; column: 3 }
+                }
+
+                Row {
+                    id: headerRow
+                    Layout.fillWidth: true
+                    height: 40
+
+                    property int lastSortedColumn: -1
+                    property bool ascending: true
+
+                    Repeater {
+                        model: headerModel
+
+                        Rectangle {
+                            width: table.columnWidthProvider(column) // ⭐ key line
+                            height: 40
+                            color: "#dddddd"
+                            border.width: 1
+
+                            required property string label
+                            required property int column
+
+                            Text {
+                                anchors.fill: parent
+                                anchors.margins: 6
+
+                                text: label
+                                font.bold: true
+                                horizontalAlignment: Text.AlignLeft
+                                verticalAlignment: Text.AlignVCenter
+
+                                elide: Text.ElideRight
+                                wrapMode: Text.NoWrap
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (headerRow.lastSortedColumn === column)
+                                        headerRow.ascending = !headerRow.ascending
+                                    else {
+                                        headerRow.lastSortedColumn = column
+                                        headerRow.ascending = true
+                                    }
+
+                                    CompoundTableModel.setSort(
+                                                column,
+                                                headerRow.ascending ? "asc" : "desc"
+                                                )
+                                }
+                            }
+                        }
                     }
                 }
-            }
-        }
 
-        // --- Table ---
-        TableView {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 36 * 5
-            clip: true
+                TableView {
+                    id: table
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
 
-            model: CompoundTableModel
+                    model: CompoundTableModel
 
-            delegate: Rectangle {
-                implicitWidth: headers[column].width
-                implicitHeight: 36
+                    clip: true
 
-                color: row % 2 === 0 ? "#ffffff" : "#f7f9fc"
-                border.color: "#e0e4ec"
+                    columnSpacing: 1
+                    rowSpacing: 1
 
-                property string roleName: headers[column].role
+                    columnWidthProvider: function(column) {
+                        if (column === 0) return 80
+                        if (column === 3) return 120
+                        if (column === 2) return 150
 
-                Text {
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                    text: model[roleName] || ""
+                        // Name column fills remaining width
+                        var fixed = 80 + 150 + 120
+                        return width - fixed
+                    }
+
+                    delegate: Rectangle {
+                        implicitWidth: 1
+                        implicitHeight: 35
+                        border.width: 0.5
+                        clip: true
+
+                        HoverHandler {
+                            id: hoverHandler
+                        }
+
+                        Text {
+                            id: cellText
+                            anchors.fill: parent
+                            anchors.margins: 6
+
+                            text: model.display
+                            horizontalAlignment: Text.AlignLeft
+                            verticalAlignment: Text.AlignVCenter
+
+                            elide: Text.ElideRight
+                            wrapMode: Text.NoWrap
+                        }
+
+                        ToolTip {
+                            visible: hoverHandler.hovered &&
+                                        cellText.implicitWidth > cellText.width
+                            text: display
+                        }
+                    }
+
+                    ScrollBar.vertical: ScrollBar {}
+
                 }
             }
-
-            ScrollBar.vertical: ScrollBar {}
         }
 
-        Item {
-            Layout.fillHeight: true
+        Rectangle {
+            height: window.height / 3
+            color: "red"
+            Layout.fillWidth: true
         }
-
-        
     }
 }

@@ -6,132 +6,153 @@ import QtQuick.Layouts
 import Metabolomics.Models 1.0
 
 Page {
-    ColumnLayout {
+    id: testessdhfgaslhbmas
+    anchors.fill: parent
+
+    ColumnLayout{
         anchors.fill: parent
-
-        TextField {
-            placeholderText: "Filter by name..."
-            onTextChanged: MockCompoundModel.setFilter(text)
-        }
-
         
-        ListModel {
-            id: headerModel
-            ListElement { label: "ID"; column: 0 }
-            ListElement { label: "Name"; column: 1 }
-            ListElement { label: "Formula"; column: 2 }
-            ListElement { label: "Exact Mass"; column: 3 }
-        }
+        RowLayout {
+                
+            Rectangle {
+                width: window.width / 3
+                Layout.fillHeight: true
+                color: "blue"
+            }
 
-        Row {
-            id: headerRow
-            Layout.fillWidth: true
-            height: 40
+            ColumnLayout {
+                Layout.fillWidth: true
 
-            property int lastSortedColumn: -1
-            property bool ascending: true
+                TextField {
+                    placeholderText: "Filter by name..."
+                    onTextChanged: MockCompoundModel.setFilter(text)
+                }
 
-            Repeater {
-                model: headerModel
+                
+                ListModel {
+                    id: headerModel
+                    ListElement { label: "ID"; column: 0 }
+                    ListElement { label: "Name"; column: 1 }
+                    ListElement { label: "Formula"; column: 2 }
+                    ListElement { label: "Exact Mass"; column: 3 }
+                }
 
-                Rectangle {
-                    width: table.columnWidthProvider(column) // ⭐ key line
+                Row {
+                    id: headerRow
+                    Layout.fillWidth: true
                     height: 40
-                    color: "#dddddd"
-                    border.width: 1
 
-                    required property string label
-                    required property int column
+                    property int lastSortedColumn: -1
+                    property bool ascending: true
 
-                    Text {
-                        anchors.fill: parent
-                        anchors.margins: 6
+                    Repeater {
+                        model: headerModel
 
-                        text: label
-                        font.bold: true
-                        horizontalAlignment: Text.AlignLeft
-                        verticalAlignment: Text.AlignVCenter
+                        Rectangle {
+                            width: table.columnWidthProvider(column) // ⭐ key line
+                            height: 40
+                            color: "#dddddd"
+                            border.width: 1
 
-                        elide: Text.ElideRight
-                        wrapMode: Text.NoWrap
-                    }
+                            required property string label
+                            required property int column
 
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            if (headerRow.lastSortedColumn === column)
-                                headerRow.ascending = !headerRow.ascending
-                            else {
-                                headerRow.lastSortedColumn = column
-                                headerRow.ascending = true
+                            Text {
+                                anchors.fill: parent
+                                anchors.margins: 6
+
+                                text: label
+                                font.bold: true
+                                horizontalAlignment: Text.AlignLeft
+                                verticalAlignment: Text.AlignVCenter
+
+                                elide: Text.ElideRight
+                                wrapMode: Text.NoWrap
                             }
 
-                            MockCompoundModel.setSort(
-                                        column,
-                                        headerRow.ascending ? "asc" : "desc"
-                                        )
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (headerRow.lastSortedColumn === column)
+                                        headerRow.ascending = !headerRow.ascending
+                                    else {
+                                        headerRow.lastSortedColumn = column
+                                        headerRow.ascending = true
+                                    }
+
+                                    MockCompoundModel.setSort(
+                                                column,
+                                                headerRow.ascending ? "asc" : "desc"
+                                                )
+                                }
+                            }
                         }
                     }
                 }
+
+
+                TableView {
+                    id: table
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    model: MockCompoundModel
+
+                    clip: true
+
+                    columnSpacing: 1
+                    rowSpacing: 1
+
+                    columnWidthProvider: function(column) {
+                        if (column === 0) return 80
+                        if (column === 3) return 120
+                        if (column === 2) return 150
+
+                        // Name column fills remaining width
+                        var fixed = 80 + 150 + 120
+                        return width - fixed
+                    }
+
+                    delegate: Rectangle {
+                        implicitWidth: 1
+                        implicitHeight: 35
+                        border.width: 0.5
+                        clip: true
+
+                        HoverHandler {
+                            id: hoverHandler
+                        }
+
+                        Text {
+                            id: cellText
+                            anchors.fill: parent
+                            anchors.margins: 6
+
+                            text: model.display
+                            horizontalAlignment: Text.AlignLeft
+                            verticalAlignment: Text.AlignVCenter
+
+                            elide: Text.ElideRight
+                            wrapMode: Text.NoWrap
+                        }
+
+                        ToolTip {
+                            visible: hoverHandler.hovered &&
+                                    cellText.implicitWidth > cellText.width
+                            text: display
+                        }
+                    }
+
+                    ScrollBar.vertical: ScrollBar {}
+
+                }
             }
         }
 
-
-        TableView {
-            id: table
+        Rectangle {
+            height: window.height / 3
+            color: "red"
             Layout.fillWidth: true
-            Layout.fillHeight: true
-
-            model: MockCompoundModel
-
-            clip: true
-
-            columnSpacing: 1
-            rowSpacing: 1
-
-            columnWidthProvider: function(column) {
-                if (column === 0) return 80
-                if (column === 3) return 120
-                if (column === 2) return 150
-
-                // Name column fills remaining width
-                var fixed = 80 + 150 + 120
-                return width - fixed
-            }
-
-            delegate: Rectangle {
-                implicitWidth: 1
-                implicitHeight: 35
-                border.width: 0.5
-                clip: true
-
-                HoverHandler {
-                    id: hoverHandler
-                }
-
-                Text {
-                    id: cellText
-                    anchors.fill: parent
-                    anchors.margins: 6
-
-                    text: model.display
-                    horizontalAlignment: Text.AlignLeft
-                    verticalAlignment: Text.AlignVCenter
-
-                    elide: Text.ElideRight
-                    wrapMode: Text.NoWrap
-                }
-
-                ToolTip {
-                    visible: hoverHandler.hovered &&
-                             cellText.implicitWidth > cellText.width
-                    text: display
-                }
-            }
-
-
-            ScrollBar.vertical: ScrollBar {}
-
         }
     }
 }

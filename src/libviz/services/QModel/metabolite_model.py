@@ -1,101 +1,101 @@
-from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex, Slot # pylint: disable=no-name-in-module
-from sqlalchemy import select
+# mock_compound_model.py
 
-from libviz.services.classes.library import Library
-from libviz.services.db.models.compound import Compound
+from PySide6.QtCore import Slot, Qt # pylint: disable=no-name-in-module
+from PySide6.QtSql import QSqlQueryModel, QSqlQuery, QSqlDatabase # pylint: disable=no-name-in-module
+from libviz.services import LibraryService
 
-class CompoundTableModel(QAbstractTableModel):
-
-    NameRole = Qt.ItemDataRole.UserRole + 1
-    FormulaRole = Qt.ItemDataRole.UserRole + 2
-    InChIKeyRole = Qt.ItemDataRole.UserRole + 3
-    ExactMassRole = Qt.ItemDataRole.UserRole + 4
-    AddedOnRole = Qt.ItemDataRole.UserRole + 5
+class CompoundTableModel(QSqlQueryModel):
 
     def __init__(self, library_service, parent=None):
-        """
-        library: instance of your Library class
-        """
         super().__init__(parent)
-        self.library_service = library_service
-        self.library: Library = None
-        self._headers = ["Name", "Formula", "InChIKey", "Exact Mass", "Added On"]
 
-        # Load initial data (all compounds, can later optimize for lazy loading)
-        self._data = []
-        print("CompoundTableModel INIT", id(self))
+        self.library_service: LibraryService = library_service
+
+        self._current_filter = ""
+        self._current_sort_column = "id"
+        self._current_sort_order = "ASC"
+        self._db = None
+
+    # ----------------------------
+    # Database Initialization
+    # ----------------------------
+
+    def _init_database(self):
+        """
+        Create and open the database connection once.
+        """
+        print("Starting init")
+
+        if QSqlDatabase.contains(self.library_service.connection_name):
+            self._db = QSqlDatabase.database(self.library_service.connection_name)
+        else:
+            self._db = QSqlDatabase.addDatabase("QSQLITE", self.library_service.connection_name)
+            self._db.setDatabaseName(self.library_service.db_path)
+
+        if not self._db.open():
+            print("Database open failed:", self._db.lastError().text())
+        else:
+            print("Database opened successfully")
+
+    # ----------------------------
+    # Model Refresh
+    # ----------------------------
 
     @Slot()
-    def load_compounds(self):
-        self.library = self.library_service._library
-        print("LOAD CALLED", id(self))
-        print("Loading compounds...")
-        session = self.library.Session()
-        stmt = select(Compound).limit(20)
-        results = session.execute(stmt).scalars().all()
-        
-        self.beginResetModel()
-        self._data = results
-        self.endResetModel()
-        print("Finished")
-        print(f"N compounds: {len(self._data)}")
+    def refresh(self):
+        print("Refreshing")
 
-    def rowCount(self, parent=QModelIndex()):
-        return len(self._data)
+        self._init_database()
 
-    def columnCount(self, parent=QModelIndex()):
-        return len(self._headers)
+        query = QSqlQuery(self._db)
 
-    def data(self, index, role):
-        if not index.isValid():
-            return None
+        sql = f"""
+            SELECT id, name, formula, exact_mass
+            FROM compound
+            WHERE name LIKE ?
+            ORDER BY {self._current_sort_column} {self._current_sort_order}
+        """
 
-        compound = self._data[index.row()]
+        if not query.prepare(sql):
+            print("Prepare failed:", query.lastError().text())
+            return
 
-        if role == self.NameRole:
-            return compound.name
-        elif role == self.FormulaRole:
-            return compound.formula
-        elif role == self.InChIKeyRole:
-            return compound.inchikey
-        elif role == self.ExactMassRole:
-            return compound.exact_mass
-        elif role == self.AddedOnRole:
-            return compound.added_on.strftime("%Y-%m-%d %H:%M:%S")
+        query.addBindValue(f"%{self._current_filter}%")
 
-        return None
+        if not query.exec():
+            print("Query failed:", query.lastError().text())
+            return
 
+        self.setQuery(query)
 
-    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
-        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Horizontal:
-            return self._headers[section]
-        return None
-    
-    def roleNames(self):
-        return {
-            self.NameRole: b"name",
-            self.FormulaRole: b"formula",
-            self.InChIKeyRole: b"inchikey",
-            self.ExactMassRole: b"exact_mass",
-            self.AddedOnRole: b"added_on",
+        if self.lastError().isValid():
+            print("Model error:", self.lastError().text())
+
+        print("Rows loaded:", self.rowCount())
+
+    # ----------------------------
+    # Filtering
+    # ----------------------------
+
+    @Slot(str)
+    def setFilter(self, text):
+        self._current_filter = text
+        self.refresh()
+
+    # ----------------------------
+    # Sorting
+    # ----------------------------
+
+    @Slot(int, str)
+    def setSort(self, column_index, order):
+        column_map = {
+            0: "id",
+            1: "name",
+            2: "formula",
+            3: "exact_mass"
         }
 
-    """
-    def sort(self, column, order):
-        self.layoutAboutToBeChanged.emit()
-        reverse = order == Qt.DescendingOrder
+        self._current_sort_column = column_map.get(column_index, "id")
+        self._current_sort_order = "ASC" if order.lower() == "asc" else "DESC"
 
-        key_map = {
-            0: lambda c: c.name or "",
-            1: lambda c: c.formula or "",
-            2: lambda c: c.inchikey or "",
-            3: lambda c: c.exact_mass or 0,
-            4: lambda c: c.added_on,
-        }
-
-        self._data.sort(key=key_map[column], reverse=reverse)
-        self.layoutChanged.emit()
-    """
-
-
-
+        self.refresh()

@@ -7,8 +7,8 @@ from PySide6.QtCore import QUrl # pylint: disable=no-name-in-module
 from PySide6.QtQuickControls2 import QQuickStyle # pylint: disable=no-name-in-module
 
 from libviz.app import AppState, Navigation
-from libviz.services.QModel.mock_model import MockCompoundModel
-#from libviz.services.QModel import CompoundTableModel
+#from libviz.services.QModel.mock_model import MockCompoundModel
+from libviz.services.QModel import CompoundTableModel
 from libviz.utils import configure_logging
 from libviz.backends import CreateLibraryBackend, LoadLibraryBackend
 from libviz.services import LibraryService
@@ -21,10 +21,11 @@ def main():
     
     library_service = LibraryService()
     create_library_backend = CreateLibraryBackend(library_service)
-    """
+    
     compound_model = CompoundTableModel(library_service)
 
     qmlRegisterSingletonInstance(CompoundTableModel, "Metabolomics.Models", 1, 0, "CompoundTableModel", compound_model)
+    library_service.libraryChanged.connect(compound_model.refresh)
     """
     mock_compound_model = MockCompoundModel()
 
@@ -35,6 +36,7 @@ def main():
         "MockCompoundModel",
         mock_compound_model
     )
+    """
 
     engine = QQmlApplicationEngine()
     load_library_backend = LoadLibraryBackend(library_service, engine)

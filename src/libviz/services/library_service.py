@@ -8,6 +8,8 @@ class LibraryService(QObject):
     def __init__(self):
         super().__init__()
         self._library = None
+        self._connection_name = "library_connection"
+        self._db_path = None
 
     @Slot(str, str)
     def create(self, name: str, path: str):
@@ -48,3 +50,12 @@ class LibraryService(QObject):
     @Property(int, notify=libraryChanged)
     def n_spectra(self):
         return self._library.n_spectra if self._library else 0
+    
+    @Property(str)
+    def db_path(self):
+        return self._library.path if self._library else ""
+    
+    @Property(str)
+    def connection_name(self):
+        return self._connection_name if self._connection_name else ""
+

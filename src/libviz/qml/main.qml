@@ -9,6 +9,7 @@ ApplicationWindow {
     visible: true
     width: 800
     height: 600
+    minimumWidth: 800
     title: "LibViz"
 
     // =========================
@@ -39,46 +40,43 @@ ApplicationWindow {
     // =========================
     // MAIN LAYOUT
     // =========================
-    ColumnLayout {
-        anchors.fill: parent
-        spacing: 0
 
         // -------- Main content --------
-        StackView {
-            id: stack
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            initialItem: HomePage2 {}
-        }
+    StackView {
+        id: stack
+        anchors.fill: parent
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        initialItem: HomePage {}
+    }
 
         // -------- Status bar --------
-        Rectangle {
-            id: statusBar
-            Layout.fillWidth: true
-            height: visible ? 32 : 0
-            visible: false
-            color: "#e8e8e8"
-            border.color: "#d0d0d0"
+    Rectangle {
+        id: statusBar
+        Layout.fillWidth: true
+        height: visible ? 32 : 0
+        visible: false
+        color: "#e8e8e8"
+        border.color: "#d0d0d0"
 
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 8
-                spacing: 12
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 8
+            spacing: 12
 
-                Text {
-                    id: statusText
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
-                }
+            Text {
+                id: statusText
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
+            }
 
-                ProgressBar {
-                    id: progressBar
-                    width: 200
-                    height: 20
-                    indeterminate: true
-                    from: 0
-                    to: 100
-                }
+            ProgressBar {
+                id: progressBar
+                width: 200
+                height: 20
+                indeterminate: true
+                from: 0
+                to: 100
             }
         }
     }
@@ -118,7 +116,6 @@ ApplicationWindow {
             statusBar.visible = false;
             statusText.text = "";
             console.log("SUCCESS SIGNAL RECEIVED");
-            CompoundTableModel.load_compounds();
             nav.show_library_page();
         }
 
