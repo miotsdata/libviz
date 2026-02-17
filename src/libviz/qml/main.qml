@@ -48,7 +48,7 @@ ApplicationWindow {
             id: stack
             Layout.fillWidth: true
             Layout.fillHeight: true
-            initialItem: HomePage {}
+            initialItem: HomePage2 {}
         }
 
         // -------- Status bar --------

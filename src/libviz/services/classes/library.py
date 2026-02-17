@@ -81,6 +81,7 @@ class Library:
         tmp_file.close()
 
         db_path = tmp_file.name
+        print(db_path)
 
         engine = create_engine(
             f"sqlite:///{db_path}",
