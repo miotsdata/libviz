@@ -23,7 +23,7 @@ Page {
             ListElement { label: "Exact Mass"; column: 3 }
         }
 
-        RowLayout {
+        Row {
             id: headerRow
             Layout.fillWidth: true
             height: 40
@@ -35,7 +35,7 @@ Page {
                 model: headerModel
 
                 Rectangle {
-                    Layout.fillWidth: true
+                    width: table.columnWidthProvider(column) // ⭐ key line
                     height: 40
                     color: "#dddddd"
                     border.width: 1
@@ -44,9 +44,16 @@ Page {
                     required property int column
 
                     Text {
-                        anchors.centerIn: parent
+                        anchors.fill: parent
+                        anchors.margins: 6
+
                         text: label
                         font.bold: true
+                        horizontalAlignment: Text.AlignLeft
+                        verticalAlignment: Text.AlignVCenter
+
+                        elide: Text.ElideRight
+                        wrapMode: Text.NoWrap
                     }
 
                     MouseArea {
@@ -69,6 +76,7 @@ Page {
             }
         }
 
+
         TableView {
             id: table
             Layout.fillWidth: true
@@ -82,19 +90,45 @@ Page {
             rowSpacing: 1
 
             columnWidthProvider: function(column) {
-                return width / 4 // 4 columns
+                if (column === 0) return 80
+                if (column === 3) return 120
+                if (column === 2) return 150
+
+                // Name column fills remaining width
+                var fixed = 80 + 150 + 120
+                return width - fixed
             }
 
             delegate: Rectangle {
                 implicitWidth: 1
                 implicitHeight: 35
                 border.width: 0.5
+                clip: true
+
+                HoverHandler {
+                    id: hoverHandler
+                }
 
                 Text {
-                    anchors.centerIn: parent
+                    id: cellText
+                    anchors.fill: parent
+                    anchors.margins: 6
+
                     text: model.display
+                    horizontalAlignment: Text.AlignLeft
+                    verticalAlignment: Text.AlignVCenter
+
+                    elide: Text.ElideRight
+                    wrapMode: Text.NoWrap
+                }
+
+                ToolTip {
+                    visible: hoverHandler.hovered &&
+                             cellText.implicitWidth > cellText.width
+                    text: display
                 }
             }
+
 
             ScrollBar.vertical: ScrollBar {}
 
