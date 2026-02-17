@@ -8,7 +8,7 @@ from PySide6.QtQuickControls2 import QQuickStyle # pylint: disable=no-name-in-mo
 
 from libviz.app import AppState, Navigation
 #from libviz.services.QModel.mock_model import MockCompoundModel
-from libviz.services.QModel import CompoundTableModel
+from libviz.services.QModel import CompoundTableModel, SpectraTableModel
 from libviz.utils import configure_logging
 from libviz.backends import CreateLibraryBackend, LoadLibraryBackend
 from libviz.services import LibraryService
@@ -23,8 +23,10 @@ def main():
     create_library_backend = CreateLibraryBackend(library_service)
     
     compound_model = CompoundTableModel(library_service)
+    spectra_table_model = SpectraTableModel(library_service)
 
     qmlRegisterSingletonInstance(CompoundTableModel, "Metabolomics.Models", 1, 0, "CompoundTableModel", compound_model)
+    qmlRegisterSingletonInstance(SpectraTableModel, "Metabolomics.Models", 1, 0, "SpectraTableModel", spectra_table_model)
     library_service.libraryChanged.connect(compound_model.refresh)
     """
     mock_compound_model = MockCompoundModel()

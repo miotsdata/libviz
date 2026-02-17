@@ -1,6 +1,6 @@
 # mock_compound_model.py
 
-from PySide6.QtCore import Slot, Qt # pylint: disable=no-name-in-module
+from PySide6.QtCore import Slot # pylint: disable=no-name-in-module
 from PySide6.QtSql import QSqlQueryModel, QSqlQuery, QSqlDatabase # pylint: disable=no-name-in-module
 from libviz.services import LibraryService
 
@@ -99,3 +99,9 @@ class CompoundTableModel(QSqlQueryModel):
         self._current_sort_order = "ASC" if order.lower() == "asc" else "DESC"
 
         self.refresh()
+
+    @Slot(int, result=int)
+    def idForRow(self, row: int) -> int:
+        """Return the compound ID at a given row index."""
+        record = self.record(row)
+        return record.value("id")
