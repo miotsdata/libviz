@@ -35,6 +35,20 @@ ApplicationWindow {
                 }
             }
         }
+
+        Menu {
+            title: "Insert"
+
+            MenuItem {
+                text: "Spectra from mzml"
+                onTriggered: {
+                    var path = LoadMzmlBackend.selectPathMzml();
+                    if (path !== "") {
+                        LoadMzmlBackend.load(path);
+                    }
+                }
+            }
+        }
     }
 
     // =========================
@@ -97,7 +111,7 @@ ApplicationWindow {
         }
 
         function onGoLibraryHomePage() {
-            stack.push("LibraryHomePage.qml");
+            stack.push("LibraryPage.qml");
         }
     }
 

@@ -10,7 +10,7 @@ from libviz.app import AppState, Navigation
 #from libviz.services.QModel.mock_model import MockCompoundModel
 from libviz.services.QModel import CompoundTableModel, SpectraTableModel, SpectrumPlotModel
 from libviz.utils import configure_logging
-from libviz.backends import CreateLibraryBackend, LoadLibraryBackend
+from libviz.backends import CreateLibraryBackend, LoadLibraryBackend, LoadMzmlBackend
 from libviz.services import LibraryService
 
 def main():
@@ -27,21 +27,13 @@ def main():
 
     spectrum_plot_model = SpectrumPlotModel(library_service)
 
+    load_mzml_backend = LoadMzmlBackend()
+
     qmlRegisterSingletonInstance(CompoundTableModel, "Metabolomics.Models", 1, 0, "CompoundTableModel", compound_model)
     qmlRegisterSingletonInstance(SpectraTableModel, "Metabolomics.Models", 1, 0, "SpectraTableModel", spectra_table_model)
     qmlRegisterSingletonInstance(SpectrumPlotModel, "Metabolomics.Models", 1, 0, "SpectrumPlotModel", spectrum_plot_model)
+    qmlRegisterSingletonInstance(LoadMzmlBackend, "Metabolomics.Models", 1, 0, "LoadMzmlBackend", load_mzml_backend)
     library_service.libraryChanged.connect(compound_model.refresh)
-    """
-    mock_compound_model = MockCompoundModel()
-
-    qmlRegisterSingletonInstance(
-        MockCompoundModel,
-        "Metabolomics.Models",
-        1, 0,
-        "MockCompoundModel",
-        mock_compound_model
-    )
-    """
 
     engine = QQmlApplicationEngine()
     load_library_backend = LoadLibraryBackend(library_service, engine)
