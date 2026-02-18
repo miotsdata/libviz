@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:25eb7115cd750786dd8e75c7b1358a0e43788b04b512c49223d4365cb887eadf"
+content_hash = "sha256:3bd4d71df179c120f757212e10467e520b31cc823471321fa2ee28dfee8b74c0"
 
 [[metadata.targets]]
 requires_python = "==3.13"
@@ -25,6 +25,16 @@ dependencies = [
 files = [
     {file = "alembic-1.18.3-py3-none-any.whl", hash = "sha256:12a0359bfc068a4ecbb9b3b02cf77856033abfdb59e4a5aca08b7eacd7b74ddd"},
     {file = "alembic-1.18.3.tar.gz", hash = "sha256:1212aa3778626f2b0f0aa6dd4e99a5f99b94bd25a0c1ac0bba3be65e081e50b0"},
+]
+
+[[package]]
+name = "altgraph"
+version = "0.17.5"
+summary = "Python graph (network) package"
+groups = ["dev"]
+files = [
+    {file = "altgraph-0.17.5-py2.py3-none-any.whl", hash = "sha256:f3a22400bce1b0c701683820ac4f3b159cd301acab067c51c653e06961600597"},
+    {file = "altgraph-0.17.5.tar.gz", hash = "sha256:c87b395dd12fabde9c99573a9749d67da8d29ef9de0125c7f536699b4a9bc9e7"},
 ]
 
 [[package]]
@@ -138,6 +148,20 @@ files = [
     {file = "librt-0.7.8-cp313-cp313-win_amd64.whl", hash = "sha256:f8f4a901a3fa28969d6e4519deceab56c55a09d691ea7b12ca830e2fa3461e34"},
     {file = "librt-0.7.8-cp313-cp313-win_arm64.whl", hash = "sha256:43d4e71b50763fcdcf64725ac680d8cfa1706c928b844794a7aa0fa9ac8e5f09"},
     {file = "librt-0.7.8.tar.gz", hash = "sha256:1a4ede613941d9c3470b0368be851df6bb78ab218635512d0370b27a277a0862"},
+]
+
+[[package]]
+name = "macholib"
+version = "1.16.4"
+summary = "Mach-O header analysis and editing"
+groups = ["dev"]
+marker = "sys_platform == \"darwin\""
+dependencies = [
+    "altgraph>=0.17",
+]
+files = [
+    {file = "macholib-1.16.4-py2.py3-none-any.whl", hash = "sha256:da1a3fa8266e30f0ce7e97c6a54eefaae8edd1e5f86f3eb8b95457cae90265ea"},
+    {file = "macholib-1.16.4.tar.gz", hash = "sha256:f408c93ab2e995cd2c46e34fe328b130404be143469e41bc366c807448979362"},
 ]
 
 [[package]]
@@ -318,6 +342,18 @@ files = [
 ]
 
 [[package]]
+name = "pefile"
+version = "2024.8.26"
+requires_python = ">=3.6.0"
+summary = "Python PE parsing module"
+groups = ["dev"]
+marker = "sys_platform == \"win32\""
+files = [
+    {file = "pefile-2024.8.26-py3-none-any.whl", hash = "sha256:76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f"},
+    {file = "pefile-2024.8.26.tar.gz", hash = "sha256:3ff6c5d8b43e8c37bb6e6dd5085658d658a7a0bdcd20b6a07b1fcfc1c4e9d632"},
+]
+
+[[package]]
 name = "platformdirs"
 version = "4.5.1"
 requires_python = ">=3.10"
@@ -348,6 +384,53 @@ groups = ["dev"]
 files = [
     {file = "pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b"},
     {file = "pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887"},
+]
+
+[[package]]
+name = "pyinstaller"
+version = "6.19.0"
+requires_python = "<3.15,>=3.8"
+summary = "PyInstaller bundles a Python application and all its dependencies into a single package."
+groups = ["dev"]
+dependencies = [
+    "altgraph",
+    "importlib-metadata>=4.6; python_version < \"3.10\"",
+    "macholib>=1.8; sys_platform == \"darwin\"",
+    "packaging>=22.0",
+    "pefile>=2022.5.30; sys_platform == \"win32\"",
+    "pyinstaller-hooks-contrib>=2026.0",
+    "pywin32-ctypes>=0.2.1; sys_platform == \"win32\"",
+    "setuptools>=42.0.0",
+]
+files = [
+    {file = "pyinstaller-6.19.0-py3-none-macosx_10_13_universal2.whl", hash = "sha256:4190e76b74f0c4b5c5f11ac360928cd2e36ec8e3194d437bf6b8648c7bc0c134"},
+    {file = "pyinstaller-6.19.0-py3-none-manylinux2014_aarch64.whl", hash = "sha256:8bd68abd812d8a6ba33b9f1810e91fee0f325969733721b78151f0065319ca11"},
+    {file = "pyinstaller-6.19.0-py3-none-manylinux2014_i686.whl", hash = "sha256:1ec54ef967996ca61dacba676227e2b23219878ccce5ee9d6f3aada7b8ed8abf"},
+    {file = "pyinstaller-6.19.0-py3-none-manylinux2014_ppc64le.whl", hash = "sha256:4ab2bb52e58448e14ddf9450601bdedd66800465043501c1d8f1cab87b60b122"},
+    {file = "pyinstaller-6.19.0-py3-none-manylinux2014_s390x.whl", hash = "sha256:da6d5c6391ccefe73554b9fa29b86001c8e378e0f20c2a4004f836ba537eff63"},
+    {file = "pyinstaller-6.19.0-py3-none-manylinux2014_x86_64.whl", hash = "sha256:a0fc5f6b3c55aa54353f0c74ffa59b1115433c1850c6f655d62b461a2ed6cbbe"},
+    {file = "pyinstaller-6.19.0-py3-none-musllinux_1_1_aarch64.whl", hash = "sha256:e649ba6bd1b0b89b210ad92adb5fbdc8a42dd2c5ca4f72ef3a0bfec83a424b83"},
+    {file = "pyinstaller-6.19.0-py3-none-musllinux_1_1_x86_64.whl", hash = "sha256:481a909c8e60c8692fc60fcb1344d984b44b943f8bc9682f2fcdae305ad297e6"},
+    {file = "pyinstaller-6.19.0-py3-none-win32.whl", hash = "sha256:3c5c251054fe4cfaa04c34a363dcfbf811545438cb7198304cd444756bc2edd2"},
+    {file = "pyinstaller-6.19.0-py3-none-win_amd64.whl", hash = "sha256:b5bb6536c6560330d364d91522250f254b107cf69129d9cbcd0e6727c570be33"},
+    {file = "pyinstaller-6.19.0-py3-none-win_arm64.whl", hash = "sha256:c2d5a539b0bfe6159d5522c8c70e1c0e487f22c2badae0f97d45246223b798ea"},
+    {file = "pyinstaller-6.19.0.tar.gz", hash = "sha256:ec73aeb8bd9b7f2f1240d328a4542e90b3c6e6fbc106014778431c616592a865"},
+]
+
+[[package]]
+name = "pyinstaller-hooks-contrib"
+version = "2026.0"
+requires_python = ">=3.8"
+summary = "Community maintained hooks for PyInstaller"
+groups = ["dev"]
+dependencies = [
+    "importlib-metadata>=4.6; python_version < \"3.10\"",
+    "packaging>=22.0",
+    "setuptools>=42.0.0",
+]
+files = [
+    {file = "pyinstaller_hooks_contrib-2026.0-py3-none-any.whl", hash = "sha256:0590db8edeba3e6c30c8474937021f5cd39c0602b4d10f74a064c73911efaca5"},
+    {file = "pyinstaller_hooks_contrib-2026.0.tar.gz", hash = "sha256:0120893de491a000845470ca9c0b39284731ac6bace26f6849dea9627aaed48e"},
 ]
 
 [[package]]
@@ -534,6 +617,29 @@ dependencies = [
 files = [
     {file = "python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"},
     {file = "python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"},
+]
+
+[[package]]
+name = "pywin32-ctypes"
+version = "0.2.3"
+requires_python = ">=3.6"
+summary = "A (partial) reimplementation of pywin32 using ctypes/cffi"
+groups = ["dev"]
+marker = "sys_platform == \"win32\""
+files = [
+    {file = "pywin32-ctypes-0.2.3.tar.gz", hash = "sha256:d162dc04946d704503b2edc4d55f3dba5c1d539ead017afa00142c38b9885755"},
+    {file = "pywin32_ctypes-0.2.3-py3-none-any.whl", hash = "sha256:8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8"},
+]
+
+[[package]]
+name = "setuptools"
+version = "82.0.0"
+requires_python = ">=3.9"
+summary = "Easily download, build, install, upgrade, and uninstall Python packages"
+groups = ["dev"]
+files = [
+    {file = "setuptools-82.0.0-py3-none-any.whl", hash = "sha256:70b18734b607bd1da571d097d236cfcfacaf01de45717d59e6e04b96877532e0"},
+    {file = "setuptools-82.0.0.tar.gz", hash = "sha256:22e0a2d69474c6ae4feb01951cb69d515ed23728cf96d05513d36e42b62b37cb"},
 ]
 
 [[package]]

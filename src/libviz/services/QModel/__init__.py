@@ -1,2 +1,3 @@
 from .metabolite_model import CompoundTableModel
 from .spectra_table_model import SpectraTableModel
+from .spectrum_plot_model import SpectrumPlotModel

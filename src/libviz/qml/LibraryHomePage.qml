@@ -193,126 +193,248 @@ Page {
             }
         }
 
-        ColumnLayout {
+        RowLayout {
+            spacing: 10
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            Text {
-                text: "Spectra for selected compound"
-                font.bold: true
-                anchors.leftMargin: 6
-            }
-
-            ListModel {
-                id: spectraHeaderModel
-                ListElement { label: "ID"; column: 0 }
-                ListElement { label: "Precursor m/z"; column: 1 }
-                ListElement { label: "Precursor Type"; column: 2 }
-                ListElement { label: "Polarity"; column: 3 }
-                ListElement { label: "Collision Energy"; column: 4 }
-                ListElement { label: "Added On"; column: 5 }
-            }
-
-            Row {
-                id: spectraHeaderRow
+            ColumnLayout {
                 Layout.fillWidth: true
-                height: 40
+                Layout.fillHeight: true
 
-                property int lastSortedColumn: -1
-                property bool ascending: true
+                Text {
+                    text: "Spectra for selected compound"
+                    font.bold: true
+                    anchors.leftMargin: 6
+                }
 
-                Repeater {
-                    model: spectraHeaderModel
+                ListModel {
+                    id: spectraHeaderModel
+                    ListElement { label: "Precursor m/z"; column: 0 }
+                    ListElement { label: "Precursor Type"; column: 1 }
+                    ListElement { label: "Polarity"; column: 2 }
+                    ListElement { label: "Collision Energy"; column: 3 }
+                    ListElement { label: "Added On"; column: 4 }
+                }
 
-                    Rectangle {
-                        width: spectraTable.columnWidthProvider(column)
-                        height: 40
-                        color: "#dddddd"
-                        border.width: 1
+                Row {
+                    id: spectraHeaderRow
+                    Layout.fillWidth: true
+                    height: 40
 
-                        required property string label
-                        required property int column
+                    property int lastSortedColumn: -1
+                    property bool ascending: true
+
+                    Repeater {
+                        model: spectraHeaderModel
+
+                        Rectangle {
+                            width: spectraTable.columnWidthProvider(column)
+                            height: 40
+                            color: "#dddddd"
+                            border.width: 1
+
+                            required property string label
+                            required property int column
+
+                            Text {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                text: label
+                                font.bold: true
+                                horizontalAlignment: Text.AlignLeft
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                                wrapMode: Text.NoWrap
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (spectraHeaderRow.lastSortedColumn === column)
+                                        spectraHeaderRow.ascending = !spectraHeaderRow.ascending
+                                    else {
+                                        spectraHeaderRow.lastSortedColumn = column
+                                        spectraHeaderRow.ascending = true
+                                    }
+
+                                    SpectraTableModel.setSort(
+                                                column,
+                                                spectraHeaderRow.ascending ? "asc" : "desc"
+                                                )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                TableView {
+                    id: spectraTable
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    model: SpectraTableModel
+
+                    clip: true
+
+                    columnSpacing: 1
+                    rowSpacing: 1
+
+                    columnWidthProvider: function(column) {
+                        if (column === 0) return 120
+                        if (column === 1) return 150
+                        if (column === 2) return 80
+                        if (column === 3) return 120
+                        if (column === 4) return 180
+                        return 100
+                    }
+
+                    delegate: Rectangle {
+                        implicitWidth: 1
+                        implicitHeight: 35
+                        border.width: 0.5
+                        clip: true
+
+                        HoverHandler { id: hoverHandlerSpectra }
 
                         Text {
+                            id: cellTextSpectra
                             anchors.fill: parent
                             anchors.margins: 6
-                            text: label
-                            font.bold: true
+                            text: model.display
                             horizontalAlignment: Text.AlignLeft
                             verticalAlignment: Text.AlignVCenter
                             elide: Text.ElideRight
                             wrapMode: Text.NoWrap
                         }
 
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                if (spectraHeaderRow.lastSortedColumn === column)
-                                    spectraHeaderRow.ascending = !spectraHeaderRow.ascending
-                                else {
-                                    spectraHeaderRow.lastSortedColumn = column
-                                    spectraHeaderRow.ascending = true
-                                }
+                        ToolTip {
+                            visible: hoverHandlerSpectra.hovered &&
+                                    cellTextSpectra.implicitWidth > cellTextSpectra.width
+                            text: model.display
+                        }
+                    }
 
-                                SpectraTableModel.setSort(
-                                            column,
-                                            spectraHeaderRow.ascending ? "asc" : "desc"
-                                            )
+                    ScrollBar.vertical: ScrollBar {}
+                }
+            }
+
+            ColumnLayout {
+                Layout.preferredWidth: window.height / 3
+                Layout.fillHeight: true
+                spacing: 10
+
+                Label {
+                    text: "MS/MS Spectrum"
+                    font.bold: true
+                }
+
+                Item {
+                    id: plotContainer
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    
+
+                    Canvas {
+                        id: canvas
+                        anchors.fill: parent
+                        property var model: SpectrumPlotModel
+
+                        onPaint: {
+                            const ctx = getContext("2d")
+                            ctx.clearRect(0, 0, width, height)
+
+                            if (!model)
+                                return
+
+                            const peaks = model.peaks
+                            if (!peaks || peaks.length === 0)
+                                return
+
+                            const minMz = model.minMz - 5
+                            const maxMz = model.maxMz + 5
+
+                            // ---- Define plotting rectangle ----
+                            const marginLeft = 50
+                            const marginRight = 20
+                            const marginTop = 20
+                            const marginBottom = 40
+
+                            const plotX = marginLeft
+                            const plotY = marginTop
+                            const plotWidth = width - marginLeft - marginRight
+                            const plotHeight = height - marginTop - marginBottom
+
+                            if (plotWidth <= 0 || plotHeight <= 0)
+                                return
+
+                            // ---- Coordinate transforms ----
+                            function xToPixel(mz) {
+                                return plotX + ((mz - minMz) / (maxMz - minMz)) * plotWidth
+                            }
+
+                            function yToPixel(intensity) {
+                                return plotY + plotHeight - (intensity / 100.0) * plotHeight
+                            }
+
+                            ctx.strokeStyle = "black"
+                            ctx.fillStyle = "black"
+                            ctx.lineWidth = 1
+
+                            // ---- Draw axes ----
+                            ctx.beginPath()
+                            ctx.moveTo(plotX, plotY)
+                            ctx.lineTo(plotX, plotY + plotHeight)
+                            ctx.lineTo(plotX + plotWidth, plotY + plotHeight)
+                            ctx.stroke()
+
+                            // ---- Y ticks (0–100 every 20) ----
+                            for (let y = 0; y <= 100; y += 20) {
+                                const py = yToPixel(y)
+
+                                ctx.beginPath()
+                                ctx.moveTo(plotX - 5, py)
+                                ctx.lineTo(plotX, py)
+                                ctx.stroke()
+
+                                ctx.fillText(y.toString(), plotX - 35, py + 4)
+                            }
+
+                            // ---- X ticks (5 total) ----
+                            if (maxMz > minMz) {
+                                const step = (maxMz - minMz) / 4.0
+
+                                for (let i = 0; i < 5; i++) {
+                                    const mzValue = minMz + i * step
+                                    const px = xToPixel(mzValue)
+
+                                    ctx.beginPath()
+                                    ctx.moveTo(px, plotY + plotHeight)
+                                    ctx.lineTo(px, plotY + plotHeight + 5)
+                                    ctx.stroke()
+
+                                    ctx.fillText(
+                                                mzValue.toFixed(1),
+                                                px - 20,
+                                                plotY + plotHeight + 20
+                                                )
+                                }
+                            }
+
+                            ctx.lineWidth = 5;
+                            // ---- Draw peaks (stick spectrum) ----
+                            for (let i = 0; i < peaks.length; i++) {
+                                const px = xToPixel(peaks[i].mz)
+                                const py = yToPixel(peaks[i].intensity)
+
+                                ctx.beginPath()
+                                ctx.moveTo(px, plotY + plotHeight)
+                                ctx.lineTo(px, py)
+                                ctx.stroke()
                             }
                         }
                     }
                 }
-            }
-
-            TableView {
-                id: spectraTable
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                model: SpectraTableModel
-
-                clip: true
-
-                columnSpacing: 1
-                rowSpacing: 1
-
-                columnWidthProvider: function(column) {
-                    if (column === 0) return 80
-                    if (column === 1) return 120
-                    if (column === 2) return 150
-                    if (column === 3) return 80
-                    if (column === 4) return 120
-                    if (column === 5) return 180
-                    return 100
-                }
-
-                delegate: Rectangle {
-                    implicitWidth: 1
-                    implicitHeight: 35
-                    border.width: 0.5
-                    clip: true
-
-                    HoverHandler { id: hoverHandlerSpectra }
-
-                    Text {
-                        id: cellTextSpectra
-                        anchors.fill: parent
-                        anchors.margins: 6
-                        text: model.display
-                        horizontalAlignment: Text.AlignLeft
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
-                        wrapMode: Text.NoWrap
-                    }
-
-                    ToolTip {
-                        visible: hoverHandlerSpectra.hovered &&
-                                 cellTextSpectra.implicitWidth > cellTextSpectra.width
-                        text: model.display
-                    }
-                }
-
-                ScrollBar.vertical: ScrollBar {}
             }
         }
     }

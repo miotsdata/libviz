@@ -24,4 +24,5 @@ dev = [
     "pylint>=4.0.4",
     "pyside6-stubs>=6.7.3.0",
     "hupper>=1.12.1",
+    "pyinstaller>=6.19.0",
 ]
