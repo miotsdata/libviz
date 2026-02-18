@@ -210,11 +210,12 @@ Page {
 
                 ListModel {
                     id: spectraHeaderModel
-                    ListElement { label: "Precursor m/z"; column: 0 }
-                    ListElement { label: "Precursor Type"; column: 1 }
-                    ListElement { label: "Polarity"; column: 2 }
-                    ListElement { label: "Collision Energy"; column: 3 }
-                    ListElement { label: "Added On"; column: 4 }
+                    ListElement { label: "ID"; column: 0 }
+                    ListElement { label: "Precursor m/z"; column: 1 }
+                    ListElement { label: "Precursor Type"; column: 2 }
+                    ListElement { label: "Polarity"; column: 3 }
+                    ListElement { label: "Collision Energy"; column: 4 }
+                    ListElement { label: "Added On"; column: 5 }
                 }
 
                 Row {
@@ -280,12 +281,16 @@ Page {
                     columnSpacing: 1
                     rowSpacing: 1
 
+                    property int selectedRow
+                    property int hoveredRow
+
                     columnWidthProvider: function(column) {
-                        if (column === 0) return 120
-                        if (column === 1) return 150
-                        if (column === 2) return 80
-                        if (column === 3) return 120
-                        if (column === 4) return 180
+                        if (column === 0) return 0
+                        if (column === 1) return 120
+                        if (column === 2) return 150
+                        if (column === 3) return 80
+                        if (column === 4) return 120
+                        if (column === 5) return 180
                         return 100
                     }
 
@@ -295,7 +300,37 @@ Page {
                         border.width: 0.5
                         clip: true
 
-                        HoverHandler { id: hoverHandlerSpectra }
+                        // Store row index
+                        required property bool selected
+                        required property bool current
+
+                        // Background for hover
+                        Rectangle {
+                            anchors.fill: parent
+                            color: spectraTable.selectedRow === row ? '#e0da20' : (spectraTable.hoveredRow === row ? '#a7a7a7' : "#ffffff")
+                        }
+
+                        HoverHandler {
+                            id: hoverHandlerSpectra
+
+                            onHoveredChanged: {
+                                spectraTable.hoveredRow = row
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                spectraTable.selectedRow = row
+                                // model.id refers to the 'id' column of the compound
+                                // var compound_id = CompoundTableModel.idForRow(table.currentRow)
+                                // console.log("Clicked compound_id:", compound_id)
+                                console.log("Clicked row:", row, "column:", column)
+                                var spectra_id = SpectraTableModel.idForRow(row)
+                                console.log("Clicked spectra_id:", spectra_id)
+                                SpectrumPlotModel.setPeakId(spectra_id)
+                            }
+                        }
 
                         Text {
                             id: cellTextSpectra
@@ -308,11 +343,6 @@ Page {
                             wrapMode: Text.NoWrap
                         }
 
-                        ToolTip {
-                            visible: hoverHandlerSpectra.hovered &&
-                                    cellTextSpectra.implicitWidth > cellTextSpectra.width
-                            text: model.display
-                        }
                     }
 
                     ScrollBar.vertical: ScrollBar {}
@@ -339,6 +369,8 @@ Page {
                         id: canvas
                         anchors.fill: parent
                         property var model: SpectrumPlotModel
+
+                        onModelChanged: canvas.requestPaint()
 
                         onPaint: {
                             const ctx = getContext("2d")
@@ -432,6 +464,12 @@ Page {
                                 ctx.lineTo(px, py)
                                 ctx.stroke()
                             }
+                        }
+                    }
+                    Connections {
+                        target: SpectrumPlotModel
+                        function onDataChanged() {
+                            canvas.requestPaint()
                         }
                     }
                 }

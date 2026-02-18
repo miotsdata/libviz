@@ -25,7 +25,7 @@ def main():
     compound_model = CompoundTableModel(library_service)
     spectra_table_model = SpectraTableModel(library_service)
 
-    spectrum_plot_model = SpectrumPlotModel()
+    spectrum_plot_model = SpectrumPlotModel(library_service)
 
     qmlRegisterSingletonInstance(CompoundTableModel, "Metabolomics.Models", 1, 0, "CompoundTableModel", compound_model)
     qmlRegisterSingletonInstance(SpectraTableModel, "Metabolomics.Models", 1, 0, "SpectraTableModel", spectra_table_model)

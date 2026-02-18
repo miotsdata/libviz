@@ -46,7 +46,8 @@ class SpectraTableModel(QSqlQueryModel):
 
         # Join with precursor_type to get its name
         sql = f"""
-            SELECT s.precursor_mz,
+            SELECT s.id,
+                   s.precursor_mz,
                    pt.formula as precursor_type,
                    s.polarity,
                    s.collision_energy,
@@ -89,7 +90,7 @@ class SpectraTableModel(QSqlQueryModel):
     @Slot(int, str)
     def setSort(self, column_index, order):
         column_map = {
-            0: "id",
+            0: "s.id",
             1: "precursor_mz",
             2: "precursor_type",
             3: "polarity",
@@ -100,3 +101,9 @@ class SpectraTableModel(QSqlQueryModel):
         self._current_sort_column = "s." + column_map.get(column_index, "s.id")
         self._current_sort_order = "ASC" if order.lower() == "asc" else "DESC"
         self.refresh()
+
+    @Slot(int, result=int)
+    def idForRow(self, row: int) -> int:
+        """Return the spectra ID at a given row index."""
+        record = self.record(row)
+        return record.value("id")
