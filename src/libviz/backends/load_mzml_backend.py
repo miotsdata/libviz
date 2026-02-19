@@ -1,10 +1,11 @@
-from PySide6.QtCore import QObject, Slot, Signal, QThread # pylint: disable=no-name-in-module
+from PySide6.QtCore import QObject, Slot, Signal, QThread, QByteArray # pylint: disable=no-name-in-module
 from PySide6.QtWidgets import QFileDialog # pylint: disable=no-name-in-module
 from PySide6.QtSql import QSqlDatabase, QSqlQuery # pylint: disable=no-name-in-module
 
 import logging
 import tempfile
 import uuid
+from pyteomics import mzml
 
 from pathlib import Path
 import numpy as np
@@ -20,7 +21,7 @@ class LoadMzmlBackend(QObject):
         super().__init__()
         self._mzml_path: Path = None
         self._db_path: Path = Path(tempfile.gettempdir()) / f"libviz_import_{uuid.uuid4()}.db"
-        self._connection_name = f"mzml_{id(self)}"
+        self._connection_name = f"mzml_{uuid.uuid4()}"
         self._thread = None
         self._worker = None
 
@@ -54,23 +55,29 @@ class LoadMzmlBackend(QObject):
         self._thread.start()
 
 
-    def _on_success(self):
-        logger.info("mzml file successfully loaded")
-        db = QSqlDatabase.addDatabase("QSQLITE", self._connection_name)
-        db.setDatabaseName(str(self._db_path))
+    def _on_success(self, db_path):
+        main_conn_name = f"{self._connection_name}_main"
+        db = QSqlDatabase.addDatabase("QSQLITE", main_conn_name)
+        db.setDatabaseName(str(db_path))
+        print(str(db_path))
+
         if not db.open():
             self.errorOccurred.emit("Failed to open temporary DB")
             return
 
         query = QSqlQuery(db)
         if query.exec("SELECT count(*) FROM spectra"):
-            if query.next():  # move to the first (and only) row
-                row_count = query.value(0)  # first column
+            if query.next():
+                row_count = query.value(0)
                 logger.info("Number of spectra rows: %s", row_count)
         else:
             logger.error("Failed to execute count query")
 
-        self.successOccurred.emit(self._db_path)
+        self.successOccurred.emit(db_path)
+
+        db.close()
+        del db
+        QSqlDatabase.removeDatabase(main_conn_name)
 
 
     def _on_error(self, message):
@@ -102,14 +109,16 @@ class LoadFromMzmlWorker(QObject):
     @Slot()
     def run(self):
         try:
+            # --- Open thread-local connection ---
             db = QSqlDatabase.addDatabase("QSQLITE", self._connection_name)
             db.setDatabaseName(str(self._db_path))
             if not db.open():
                 self.errorOccurred.emit("Failed to open temporary DB")
                 return
 
-            query = QSqlQuery(db)
-            query.exec("""
+            # --- Setup table ---
+            setup_query = QSqlQuery(db)
+            setup_query.exec("""
                 CREATE TABLE IF NOT EXISTS spectra (
                     id INTEGER PRIMARY KEY,
                     spectrum_index INTEGER,
@@ -120,58 +129,110 @@ class LoadFromMzmlWorker(QObject):
                     intensity_array BLOB
                 )
             """)
+            setup_query.exec("CREATE INDEX IF NOT EXISTS idx_spectrum_precursor_mz ON spectra(precursor_mz)")
+            setup_query.finish()  # destroy setup_query
 
+            db.transaction()  # begin transaction for bulk insert
+
+            # --- Stream spectra efficiently ---
             for idx, spectrum in enumerate(MzMLParser.parse(self._mzml_path)):
-                mz = np.array(spectrum.mz, dtype=np.float32)
-                intensity = np.array(spectrum.intensity, dtype=np.float32)
+                mz = np.round(np.array(spectrum.mz, dtype=np.float32), 4).tobytes()
+                intensity = np.round(np.array(spectrum.intensity, dtype=np.float32), 2).tobytes()
 
-                # sort to make hash deterministic
-                order = np.argsort(mz)
-                mz = mz[order]
-                intensity = intensity[order]
-                mz = np.round(mz[order], 4).tobytes()
-                intensity = np.round(intensity[order], 2).tobytes()
+                mz_blob = QByteArray(mz)
+                intensity_blob = QByteArray(intensity)
 
-                query.prepare("""
+                insert_query = QSqlQuery(db)
+                insert_query.prepare("""
                     INSERT INTO spectra
                     (spectrum_index, precursor_mz, collision_energy, polarity, mz_array, intensity_array)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """)
-                query.addBindValue(idx)
-                query.addBindValue(spectrum.precursor_mz)
-                query.addBindValue(spectrum.collision_energy)
-                query.addBindValue(spectrum.polarity)
-                query.addBindValue(mz)
-                query.addBindValue(intensity)
-                query.exec()
+                insert_query.addBindValue(int(spectrum.index))
+                insert_query.addBindValue(float(spectrum.precursor_mz))
+                insert_query.addBindValue(float(spectrum.collision_energy))
+                insert_query.addBindValue(spectrum.polarity)
+                insert_query.addBindValue(mz_blob)
+                insert_query.addBindValue(intensity_blob)
+                insert_query.exec_()
+                insert_query.finish()  # destroy query immediately
 
+            db.commit()  # commit transaction
             db.close()
+            del db
+            QSqlDatabase.removeDatabase(self._connection_name)  # safe now
+
             self.finished.emit(self._db_path)
 
-        except FileNotFoundError:
-            self.errorOccurred.emit("File not found")
         except Exception as e:
             logger.exception("Failed to import mzML")
             self.errorOccurred.emit(str(e))
 
 
+
+
 class MzMLParser:
+
     class Spectrum:
-        def __init__(self, precursor_mz, collision_energy, polarity, mz, intensity):
+        __slots__ = (
+            "index",
+            "precursor_mz",
+            "collision_energy",
+            "polarity",
+            "mz",
+            "intensity",
+        )
+
+        def __init__(self, index, precursor_mz, collision_energy, polarity, mz, intensity):
+            self.index = index
             self.precursor_mz = precursor_mz
             self.collision_energy = collision_energy
             self.polarity = polarity
-            self.mz = mz
-            self.intensity = intensity
+            self.mz = mz              # NumPy array (no copy)
+            self.intensity = intensity  # NumPy array (no copy)
 
     @staticmethod
     def parse(path):
-        # Replace with actual mzML parsing
-        for i in range(10):
-            yield MzMLParser.Spectrum(
-                precursor_mz=500.0 + i,
-                collision_energy=20.0 + i,
-                polarity="positive",
-                mz=[100.0, 200.0, 300.0],
-                intensity=[10.0, 20.0, 30.0]
-            )
+        with mzml.MzML(path) as reader:
+
+            for spec in reader:
+
+                # Fast MS level check
+                if spec.get("ms level") != 2:
+                    continue
+
+                # Fast polarity detection
+                polarity = (
+                    "positive" if "positive scan" in spec
+                    else "negative" if "negative scan" in spec
+                    else None
+                )
+
+                # Direct array access (NO conversion)
+                mz_array = spec.get("m/z array")
+                intensity_array = spec.get("intensity array")
+
+                if mz_array is None or intensity_array is None:
+                    continue
+
+                # Precursor info (safe + fewer lookups)
+                precursor_mz = None
+                collision_energy = None
+                index = spec.get("index")
+
+                precursor_list = spec.get("precursorList")
+                if precursor_list:
+                    precursor = precursor_list["precursor"][0]
+                    selected_ion = precursor["selectedIonList"]["selectedIon"][0]
+
+                    precursor_mz = selected_ion.get("selected ion m/z")
+                    collision_energy = precursor["activation"].get("collision energy")
+
+                yield MzMLParser.Spectrum(
+                    index,
+                    precursor_mz,
+                    collision_energy,
+                    polarity,
+                    mz_array,
+                    intensity_array
+                )

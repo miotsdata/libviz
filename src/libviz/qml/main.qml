@@ -111,7 +111,7 @@ ApplicationWindow {
         }
 
         function onGoLibraryHomePage() {
-            stack.push("LibraryPage.qml");
+            stack.push("LibraryHomePage.qml");
         }
     }
 
