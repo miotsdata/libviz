@@ -139,4 +139,19 @@ ApplicationWindow {
             console.log("Error:", message);
         }
     }
+
+    Connections {
+        target: LoadMzmlBackend
+
+        function onMzmlLoading(path) {
+            statusBar.visible = true;
+            statusText.text = "Loading \"" + path + "\"";
+        }
+
+        function onSuccessOccurred(path) {
+            var component = Qt.createComponent("AddSpectraWindow.qml")
+            var window    = component.createObject()
+            window.show()
+        }
+    }
 }

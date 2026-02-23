@@ -51,7 +51,8 @@ def main():
     engine.rootContext().setContextProperty("libraryService", library_service)
 
     qml_dir = Path(__file__).parent / "qml"
-    main_qml = qml_dir / "main.qml"
+    #main_qml = qml_dir / "main.qml"
+    main_qml = qml_dir / "AddSpectraWindow.qml"
 
     engine.load(QUrl.fromLocalFile(main_qml.resolve().as_posix()))
 
