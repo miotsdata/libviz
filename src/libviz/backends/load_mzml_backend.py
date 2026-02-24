@@ -123,6 +123,7 @@ class LoadFromMzmlWorker(QObject):
                     id INTEGER PRIMARY KEY,
                     spectrum_index INTEGER,
                     precursor_mz REAL,
+                    retention_time REAL,
                     collision_energy REAL,
                     polarity TEXT,
                     mz_array BLOB,
@@ -145,11 +146,12 @@ class LoadFromMzmlWorker(QObject):
                 insert_query = QSqlQuery(db)
                 insert_query.prepare("""
                     INSERT INTO spectrum
-                    (spectrum_index, precursor_mz, collision_energy, polarity, mz_array, intensity_array)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    (spectrum_index, precursor_mz, retention_time, collision_energy, polarity, mz_array, intensity_array)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 """)
                 insert_query.addBindValue(int(spectrum.index))
                 insert_query.addBindValue(float(spectrum.precursor_mz))
+                insert_query.addBindValue(float(spectrum.retention_time))
                 insert_query.addBindValue(float(spectrum.collision_energy))
                 insert_query.addBindValue(spectrum.polarity)
                 insert_query.addBindValue(mz_blob)
@@ -177,15 +179,17 @@ class MzMLParser:
         __slots__ = (
             "index",
             "precursor_mz",
+            "retention_time",
             "collision_energy",
             "polarity",
             "mz",
             "intensity",
         )
 
-        def __init__(self, index, precursor_mz, collision_energy, polarity, mz, intensity):
+        def __init__(self, index, precursor_mz, retention_time, collision_energy, polarity, mz, intensity):
             self.index = index
             self.precursor_mz = precursor_mz
+            self.retention_time = retention_time
             self.collision_energy = collision_energy
             self.polarity = polarity
             self.mz = mz              # NumPy array (no copy)
@@ -207,6 +211,8 @@ class MzMLParser:
                     else "negative" if "negative scan" in spec
                     else None
                 )
+
+                retention_time = spec["scanList"]["scan"][0].get("scan start time", 0)
 
                 # Direct array access (NO conversion)
                 mz_array = spec.get("m/z array")
@@ -231,6 +237,7 @@ class MzMLParser:
                 yield MzMLParser.Spectrum(
                     index,
                     precursor_mz,
+                    retention_time,
                     collision_energy,
                     polarity,
                     mz_array,

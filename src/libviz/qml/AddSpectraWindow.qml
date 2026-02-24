@@ -136,8 +136,9 @@ ApplicationWindow {
                     ListElement { label: "ID"; column: 0 }
                     ListElement { label: "spectrum_index"; column: 1 }
                     ListElement { label: "precursor_mz"; column: 2 }
-                    ListElement { label: "Polarity"; column: 3 }
-                    ListElement { label: "collision_energy"; column: 4 }
+                    ListElement { label: "retention_time"; column: 3 }
+                    ListElement { label: "Polarity"; column: 4 }
+                    ListElement { label: "collision_energy"; column: 5 }
                 }
 
                 Row {

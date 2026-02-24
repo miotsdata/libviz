@@ -55,6 +55,7 @@ class AddSpectraTableModel(QSqlQueryModel):
             SELECT id,
                    spectrum_index,
                    precursor_mz,
+                   retention_time,
                    polarity,
                    collision_energy
             FROM spectrum
