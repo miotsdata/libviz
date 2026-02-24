@@ -7,7 +7,7 @@ import tempfile
 
 from libviz.services.db.extensions import Base
 from libviz.services.db.models import Compound, Spectrum, LibraryMetadata, SpectrumMetadata, AdductType
-from libviz.services.db.models.adducts_type import populate_precursor_types
+from libviz.services.db.models.adducts_type import populate_adduct_types
 from libviz.services.db.models.spectrum import calculate_spectrum_hash
 from libviz.utils import parse_msp, calculate_exact_mass, infer_precursor_delta
 
@@ -40,7 +40,7 @@ class Library:
             )
             session.add(meta)
 
-            populate_precursor_types(session)
+            populate_adduct_types(session)
 
 
     @classmethod
@@ -101,7 +101,7 @@ class Library:
         session.add(meta)
         session.commit()
 
-        populate_precursor_types(session)
+        populate_adduct_types(session)
 
         # Parse MSP file
         parse_msp_generator = parse_msp(msp_path)
@@ -151,6 +151,7 @@ class Library:
 
     @staticmethod
     def _insert_msp_entry(session: Session, entry):
+        
         # ---------- prepare mz/intensity ----------
         mz = np.array([float(m) for m, _ in entry.get("peaks", [])], dtype=np.float32)
         intensity = np.array([float(i) for _, i in entry.get("peaks", [])], dtype=np.float32)
@@ -163,29 +164,30 @@ class Library:
         spectrum_hash = calculate_spectrum_hash(mz, intensity)
 
         # ---------- precursor type ----------
-        precursortype_formula = entry.get("PRECURSORTYPE")
-        precursortype = session.query(AdductType).filter_by(
-            formula=precursortype_formula
+        adduct_type_formula = entry.get("PRECURSORTYPE")
+        adduct_type = session.query(AdductType).filter_by(
+            formula=adduct_type_formula
         ).one_or_none()
 
-        if precursortype is None:
+        if adduct_type is None:
             try:
-                charge, delta = infer_precursor_delta(precursortype_formula)
+                charge, delta = infer_precursor_delta(adduct_type_formula)
             except ValueError:
                 # Skip unusual precursors
-                logger.warning("Skipping precursor: %s", precursortype_formula)
+                logger.warning("Skipping precursor: %s", adduct_type_formula)
                 return
-            precursortype = AdductType(
-                formula=precursortype_formula,
+            adduct_type = AdductType(
+                formula=adduct_type_formula,
                 delta_mass=delta,
                 charge=charge
             )
-            session.add(precursortype)
+            session.add(adduct_type)
             session.flush()
+        
 
         # ---------- check if spectrum already exists ----------
         existing = session.query(Spectrum).filter_by(
-            precursor_type_id=precursortype.id,
+            adduct_type_id=adduct_type.id,
             polarity=entry.get("IONMODE"),
             collision_energy = float(entry.get("COLLISIONENERGY") or 0.0),
             spectrum_hash=spectrum_hash
@@ -201,6 +203,7 @@ class Library:
         if inchikey:
             compound = session.query(Compound).filter_by(inchikey=inchikey).one_or_none()
 
+
         if compound is None:
             compound = Compound(
                 name=entry.get("NAME"),
@@ -215,7 +218,7 @@ class Library:
         spectrum = Spectrum.from_arrays(
             compound_id=compound.id,
             precursor_mz=float(entry["PRECURSORMZ"]),
-            precursor_type_id=precursortype.id,
+            adduct_type_id=adduct_type.id,
             polarity=entry.get("IONMODE"),
             collision_energy=float(entry.get("COLLISIONENERGY") or 0.0),
             mz=mz,
@@ -243,3 +246,16 @@ class Library:
                 )
 
         return spectrum
+
+    def get_adducts(self):
+        with self.session_scope() as session:
+            adducts = session.query(AdductType).all()
+            return [{"id": a.id, "formula": a.formula, "charge": a.charge, 
+                     "delta_mass": a.delta_mass} for a in adducts]
+
+    def get_adduct_delta(self, adduct_id: int):
+        with self.session_scope() as session:
+            adduct = session.query(AdductType).filter_by(id=adduct_id).one_or_none()
+            if adduct is None:
+                raise ValueError(f"Adduct with ID {adduct_id} not found")
+            return adduct.delta_mass

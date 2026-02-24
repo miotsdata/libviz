@@ -13,8 +13,11 @@ ApplicationWindow {
     title: "Add spectra from mzML file"
 
     Pane {
+        id: addSpectraPane
         anchors.fill: parent
         padding: 10
+
+        property int adduct_id: -1
         
         ColumnLayout {
             id: allCol
@@ -24,103 +27,118 @@ ApplicationWindow {
             ColumnLayout {
                 id: filterByMzColLayout
                 Layout.fillWidth: true
-                    Text {
-                            Layout.fillWidth: true
-                            horizontalAlignment: Text.AlignHCenter
-                            text: qsTr("Search by m/z")
 
-                            DebugRectangle {}
-                        }
-                    
+                // 🔹 Central safe updater function
+                function safeUpdateMZ() {
+                    var formula = molecularFormulaText.text
+                    var adduct_id = addSpectraPane.adduct_id
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        
-                        TextField {
-                            id: mzText
-                            placeholderText: qsTr("Search by m/z...")
-                            Layout.preferredWidth: addSpectraWindow.width / 4
-                            Layout.preferredHeight: 40
+                    print("Updating m/z with formula:", formula, "and adduct_id:", adduct_id)
 
-                            Keys.onEscapePressed: {
-                                focus = false
-                            }
-
-                            Keys.onReturnPressed: {
-                                print("Searching by m/z: " + mzText.text)
-                                filterByMzButton.clicked()
-                            }
-
-                            validator: DoubleValidator {
-                                bottom: 0.0
-                                decimals: 4
-                            }
-                        }
-
-                        Button {
-                            id: filterByMzButton
-                            text: qsTr("Search")
-                            enabled: mzText.text != ""
-                            onClicked: {
-                                print("Searching by m/z: " + mzText.text)
-                                AddSpectraTableModel.refresh(parseFloat(mzText.text), ppmToleranceSpinBox.value)
-                            }
-                        }
+                    // disable search if formula or adduct not selected
+                    if (!formula || adduct_id === -1) {
+                        mzText.text = ""
+                        filterByMzButton.enabled = false
+                        return
                     }
-            }
 
-            ColumnLayout {
-                id: filterByFormulaLayout
-                Layout.fillWidth: true
+                    try {
+                        var mz = AddSpectraBackend.calculate_mz_from_formula_adduct(formula, adduct_id)
 
+                        if (mz === undefined || mz === null || isNaN(mz)) {
+                            mzText.text = ""
+                            filterByMzButton.enabled = false
+                        } else {
+                            mzText.text = mz.toFixed(4)
+                            filterByMzButton.enabled = true
+                        }
+                    } catch (e) {
+                        console.log("Error calculating m/z:", e)
+                        mzText.text = ""
+                        filterByMzButton.enabled = false
+                    }
+                }
+
+                // 🔹 Header
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    text: qsTr("Search by Molecular formula + Adduct")
+                    text: qsTr("Search by m/z")
                 }
 
+                // 🔹 Input + button
                 RowLayout {
                     Layout.fillWidth: true
-                    
-                    TextField {
-                        id: molecularFormulaText
 
-                        placeholderText: qsTr("Molecular Formula...")
+                    // m/z TextField
+                    TextField {
+                        id: mzText
+                        placeholderText: qsTr("Search by m/z...")
                         Layout.preferredWidth: addSpectraWindow.width / 4
                         Layout.preferredHeight: 40
 
-                        Keys.onEscapePressed: {
-                            focus = false
+                        Keys.onEscapePressed: focus = false
+                        Keys.onReturnPressed: filterByMzButton.clicked()
+
+                        validator: DoubleValidator {
+                            bottom: 0.0
+                            decimals: 4
                         }
                     }
 
-                    TextField {
-
-                        placeholderText: qsTr("Mo capiamo come cazzo fare")
-                        Layout.preferredWidth: addSpectraWindow.width / 4
-                        Layout.preferredHeight: 40
-                        Keys.onEscapePressed: {
-                            focus = false
-                        }
+                    SpinBox { 
+                        id: ppmToleranceSpinBox 
+                        from: 0 
+                        to: 100 
+                        value: 5 
+                        stepSize: 1 
+                        Layout.preferredWidth: 120 
+                        Layout.preferredHeight: 40 
+                        editable: true 
+                        validator: IntValidator { 
+                            bottom: 0 
+                            top: 100 
+                            }
                     }
 
-                    SpinBox {
-                        id: ppmToleranceSpinBox
-                        from: 0
-                        to: 100
-                        value: 5
-                        stepSize: 1
-                        Layout.preferredWidth: 120
-                        Layout.preferredHeight: 40
-                        editable: true
-                        validator: IntValidator {
-                            bottom: 0
-                            top: 100
-                        }
-                    }
-
+                    // Search button
                     Button {
+                        id: filterByMzButton
                         text: qsTr("Search")
+                        enabled: mzText.text !== ""  // initially disabled
+                        onClicked: {
+                            AddSpectraTableModel.refresh(parseFloat(mzText.text), ppmToleranceSpinBox.value)
+                        }
+                    }
+                }
+
+                // 🔹 Hooks to reactively update m/z when formula or adduct changes
+                TextField {
+                    id: molecularFormulaText
+                    placeholderText: qsTr("Molecular Formula...")
+                    Layout.preferredWidth: addSpectraWindow.width / 4
+                    Layout.preferredHeight: 40
+
+                    Keys.onEscapePressed: focus = false
+
+                    onEditingFinished: filterByMzColLayout.safeUpdateMZ()
+                }
+
+                ComboBox {
+                    id: adductCombo
+                    Layout.preferredHeight: 40
+                    model: AdductListModel
+                    textRole: "formula"
+
+                    onCurrentIndexChanged: {
+                        if (currentIndex >= 0) {
+                            addSpectraPane.adduct_id = AdductListModel.getId(currentIndex);
+                            print("Selected adduct ID:", addSpectraPane.adduct_id);
+                        }
+                        else
+                            addSpectraPane.adduct_id = -1
+
+                        filterByMzColLayout.safeUpdateMZ()
                     }
                 }
             }
@@ -129,7 +147,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.preferredHeight: addSpectraWindow.height / 3
 
-                DebugRectangle {}
+                
 
                 ListModel {
                     id: headerModel
@@ -142,7 +160,7 @@ ApplicationWindow {
                 }
 
                 Row {
-                    DebugRectangle {}
+                    
                     id: headerRow
                     Layout.fillWidth: true
                     height: 40

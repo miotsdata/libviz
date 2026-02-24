@@ -8,9 +8,9 @@ from PySide6.QtQuickControls2 import QQuickStyle # pylint: disable=no-name-in-mo
 
 from libviz.app import AppState, Navigation
 #from libviz.services.QModel.mock_model import MockCompoundModel
-from libviz.services.QModel import CompoundTableModel, SpectraTableModel, SpectrumPlotModel, AddSpectraTableModel
+from libviz.services.QModel import CompoundTableModel, SpectraTableModel, SpectrumPlotModel, AddSpectraTableModel, AdductListModel
 from libviz.utils import configure_logging
-from libviz.backends import CreateLibraryBackend, LoadLibraryBackend, LoadMzmlBackend
+from libviz.backends import CreateLibraryBackend, LoadLibraryBackend, LoadMzmlBackend, AddSpectraBackend
 from libviz.services import LibraryService
 
 def main():
@@ -32,13 +32,22 @@ def main():
 
     add_spectra_table_model = AddSpectraTableModel()
 
+    adduct_list_model = AdductListModel(library_service)
+
+    add_spectra_backend = AddSpectraBackend(library_service)
+
     qmlRegisterSingletonInstance(CompoundTableModel, "Metabolomics.Models", 1, 0, "CompoundTableModel", compound_model)
     qmlRegisterSingletonInstance(SpectraTableModel, "Metabolomics.Models", 1, 0, "SpectraTableModel", spectra_table_model)
     qmlRegisterSingletonInstance(SpectrumPlotModel, "Metabolomics.Models", 1, 0, "SpectrumPlotModel", spectrum_plot_model)
     qmlRegisterSingletonInstance(LoadMzmlBackend, "Metabolomics.Models", 1, 0, "LoadMzmlBackend", load_mzml_backend)
     qmlRegisterSingletonInstance(AddSpectraTableModel, "Metabolomics.Models", 1, 0, "AddSpectraTableModel", add_spectra_table_model)
+    qmlRegisterSingletonInstance(AdductListModel, "Metabolomics.Models", 1, 0, "AdductListModel", adduct_list_model)
+    qmlRegisterSingletonInstance(AddSpectraBackend, "Metabolomics.Models", 1, 0, "AddSpectraBackend", add_spectra_backend)
+
+
     library_service.libraryChanged.connect(compound_model.refresh)
     load_mzml_backend.successOccurred.connect(add_spectra_table_model.set_db)
+    library_service.libraryChanged.connect(adduct_list_model.refresh)
 
     engine = QQmlApplicationEngine()
     load_library_backend = LoadLibraryBackend(library_service, engine)

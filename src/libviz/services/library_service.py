@@ -59,3 +59,12 @@ class LibraryService(QObject):
     def connection_name(self):
         return self._connection_name if self._connection_name else ""
 
+    def get_adducts(self):
+        if self._library:
+            return self._library.get_adducts()
+        return []
+
+    def get_adduct_delta(self, adduct_id: int):
+        if self._library:
+            return self._library.get_adduct_delta(adduct_id)
+        raise ValueError("No library loaded")

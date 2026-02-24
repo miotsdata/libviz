@@ -2,3 +2,4 @@ from .metabolite_model import CompoundTableModel
 from .spectra_table_model import SpectraTableModel
 from .spectrum_plot_model import SpectrumPlotModel
 from .add_spectra_table_model import AddSpectraTableModel
+from .adduct_type_list_model import AdductListModel

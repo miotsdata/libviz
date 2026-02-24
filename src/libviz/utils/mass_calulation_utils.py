@@ -1,5 +1,6 @@
 import re
 from pyteomics.mass import calculate_mass
+from pyteomics.auxiliary.structures import PyteomicsError
 PROTON = 1.007276466812
 
 def infer_precursor_delta(name: str) -> tuple[int, float]:
@@ -45,3 +46,11 @@ def calculate_exact_mass(formula: str, n_decimals: int = 4) -> float | None:
         return round(calculate_mass(formula=formula), n_decimals)
     except Exception:
         return None
+
+def calculate_exact_mass_formula_adduct(formula: str, delta: float, n_decimals: int = 4) -> float | None:
+    if not formula:
+        return None
+    try:
+        return round(calculate_mass(formula=formula) + delta, n_decimals)
+    except PyteomicsError as e:
+        raise e
