@@ -12,7 +12,7 @@ class Spectrum(Base):
     id = Column(Integer, primary_key=True)
     compound_id = Column(Integer, ForeignKey("compound.id"), nullable=False)
     precursor_mz = Column(Float, index=True, nullable=False)
-    precursor_type_id = Column(Integer, ForeignKey("precursor_type.id"), nullable=False)
+    adduct_type_id = Column(Integer, ForeignKey("adduct_type.id"), nullable=False)
     polarity = Column(String, index=True, nullable=False)
     collision_energy = Column(Float, index=True, nullable=False)
     mz_array = Column(LargeBinary, nullable=False)
@@ -25,7 +25,7 @@ class Spectrum(Base):
     spectrum_hash = Column(String(64), nullable=False)
 
     compound = relationship("Compound", back_populates="spectra")
-    precursor_type = relationship("PrecursorType", back_populates="spectra")
+    adduct_type = relationship("AdductType", back_populates="spectra")
     spectrum_metadata = relationship(
         "SpectrumMetadata",
         back_populates="spectrum",
@@ -34,7 +34,7 @@ class Spectrum(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "precursor_type_id",
+            "adduct_type_id",
             "polarity",
             "collision_energy",
             "spectrum_hash",
@@ -48,7 +48,7 @@ class Spectrum(Base):
         *,
         compound_id: int,
         precursor_mz: float,
-        precursor_type_id: int,
+        adduct_type_id: int,
         polarity: str,
         collision_energy: float,
         mz: np.ndarray,
@@ -63,7 +63,7 @@ class Spectrum(Base):
         return cls(
             compound_id=compound_id,
             precursor_mz=precursor_mz,
-            precursor_type_id=precursor_type_id,
+            adduct_type_id=adduct_type_id,
             polarity=polarity,
             collision_energy=collision_energy,
             mz_array=mz.tobytes(),

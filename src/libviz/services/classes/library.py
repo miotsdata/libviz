@@ -6,8 +6,8 @@ import logging
 import tempfile
 
 from libviz.services.db.extensions import Base
-from libviz.services.db.models import Compound, Spectrum, LibraryMetadata, SpectrumMetadata, PrecursorType
-from libviz.services.db.models.precursor_type import populate_precursor_types
+from libviz.services.db.models import Compound, Spectrum, LibraryMetadata, SpectrumMetadata, AdductType
+from libviz.services.db.models.adducts_type import populate_precursor_types
 from libviz.services.db.models.spectrum import calculate_spectrum_hash
 from libviz.utils import parse_msp, calculate_exact_mass, infer_precursor_delta
 
@@ -164,7 +164,7 @@ class Library:
 
         # ---------- precursor type ----------
         precursortype_formula = entry.get("PRECURSORTYPE")
-        precursortype = session.query(PrecursorType).filter_by(
+        precursortype = session.query(AdductType).filter_by(
             formula=precursortype_formula
         ).one_or_none()
 
@@ -175,7 +175,7 @@ class Library:
                 # Skip unusual precursors
                 logger.warning("Skipping precursor: %s", precursortype_formula)
                 return
-            precursortype = PrecursorType(
+            precursortype = AdductType(
                 formula=precursortype_formula,
                 delta_mass=delta,
                 charge=charge

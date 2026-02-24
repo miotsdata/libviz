@@ -6,7 +6,7 @@ from libviz.services.db.extensions import Base
 PROTON = 1.007276466812
 ELECTRON = 0.000548579909065  # optional, often ignored
 
-COMMON_PRECURSORS = [
+COMMON_ADDUCTS = [
     # Positive mode
     {"formula": "[M+H]+",     "charge": 1, "delta": PROTON},
     {"formula": "[M+Na]+",    "charge": 1, "delta": 22.989218},
@@ -21,8 +21,8 @@ COMMON_PRECURSORS = [
     {"formula": "[M+FA-H]-",  "charge": -1, "delta": 44.998201},
 ]
 
-class PrecursorType(Base):
-    __tablename__ = "precursor_type"
+class AdductType(Base):
+    __tablename__ = "adduct_type"
 
     id = Column(Integer, primary_key=True)
 
@@ -30,13 +30,13 @@ class PrecursorType(Base):
     charge = Column(Integer, nullable=False)
     delta_mass = Column(Float, index=True)
 
-    spectra = relationship("Spectrum", back_populates="precursor_type")
+    spectra = relationship("Spectrum", back_populates="adduct_type")
 
 
-def populate_precursor_types(session):
+def populate_adduct_types(session):
 
-    for p in COMMON_PRECURSORS:
-        exists = session.query(PrecursorType)\
+    for p in COMMON_ADDUCTS:
+        exists = session.query(AdductType)\
             .filter_by(formula=p["formula"])\
             .one_or_none()
 
@@ -44,7 +44,7 @@ def populate_precursor_types(session):
             continue
 
         session.add(
-            PrecursorType(
+            AdductType(
                 formula=p["formula"],
                 charge=p["charge"],
                 delta_mass=p["delta"],

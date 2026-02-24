@@ -7,7 +7,7 @@ class SpectraTableModel(QSqlQueryModel):
     """
     QSqlQueryModel for spectra table.
     Only shows relevant info:
-    id, precursor_mz, precursor_type (name), polarity, collision_energy, added_on
+    id, precursor_mz, adduct_type, polarity, collision_energy, added_on
     """
 
     def __init__(self, library_service, parent=None):
@@ -44,16 +44,16 @@ class SpectraTableModel(QSqlQueryModel):
         self._init_database()
         query = QSqlQuery(self._db)
 
-        # Join with precursor_type to get its name
+        # Join with adduct_type to get its name
         sql = f"""
             SELECT s.id,
                    s.precursor_mz,
-                   pt.formula as precursor_type,
+                   at.formula as adduct_type,
                    s.polarity,
                    s.collision_energy,
                    s.added_on
             FROM spectrum s
-            JOIN precursor_type pt ON s.precursor_type_id = pt.id
+            JOIN adduct_type at ON s.adduct_type_id = at.id
             WHERE s.compound_id = ?
             ORDER BY {self._current_sort_column} {self._current_sort_order}
         """
@@ -92,7 +92,7 @@ class SpectraTableModel(QSqlQueryModel):
         column_map = {
             0: "s.id",
             1: "precursor_mz",
-            2: "precursor_type",
+            2: "adduct_type",
             3: "polarity",
             4: "collision_energy",
             5: "added_on"
