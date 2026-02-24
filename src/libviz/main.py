@@ -8,7 +8,7 @@ from PySide6.QtQuickControls2 import QQuickStyle # pylint: disable=no-name-in-mo
 
 from libviz.app import AppState, Navigation
 #from libviz.services.QModel.mock_model import MockCompoundModel
-from libviz.services.QModel import CompoundTableModel, SpectraTableModel, SpectrumPlotModel
+from libviz.services.QModel import CompoundTableModel, SpectraTableModel, SpectrumPlotModel, AddSpectraTableModel
 from libviz.utils import configure_logging
 from libviz.backends import CreateLibraryBackend, LoadLibraryBackend, LoadMzmlBackend
 from libviz.services import LibraryService
@@ -26,14 +26,19 @@ def main():
     spectra_table_model = SpectraTableModel(library_service)
 
     spectrum_plot_model = SpectrumPlotModel(library_service)
+    
 
     load_mzml_backend = LoadMzmlBackend()
+
+    add_spectra_table_model = AddSpectraTableModel()
 
     qmlRegisterSingletonInstance(CompoundTableModel, "Metabolomics.Models", 1, 0, "CompoundTableModel", compound_model)
     qmlRegisterSingletonInstance(SpectraTableModel, "Metabolomics.Models", 1, 0, "SpectraTableModel", spectra_table_model)
     qmlRegisterSingletonInstance(SpectrumPlotModel, "Metabolomics.Models", 1, 0, "SpectrumPlotModel", spectrum_plot_model)
     qmlRegisterSingletonInstance(LoadMzmlBackend, "Metabolomics.Models", 1, 0, "LoadMzmlBackend", load_mzml_backend)
+    qmlRegisterSingletonInstance(AddSpectraTableModel, "Metabolomics.Models", 1, 0, "AddSpectraTableModel", add_spectra_table_model)
     library_service.libraryChanged.connect(compound_model.refresh)
+    load_mzml_backend.successOccurred.connect(add_spectra_table_model.set_db)
 
     engine = QQmlApplicationEngine()
     load_library_backend = LoadLibraryBackend(library_service, engine)
@@ -51,8 +56,8 @@ def main():
     engine.rootContext().setContextProperty("libraryService", library_service)
 
     qml_dir = Path(__file__).parent / "qml"
-    #main_qml = qml_dir / "main.qml"
-    main_qml = qml_dir / "AddSpectraWindow.qml"
+    main_qml = qml_dir / "main.qml"
+    #main_qml = qml_dir / "AddSpectraWindow.qml"
 
     engine.load(QUrl.fromLocalFile(main_qml.resolve().as_posix()))
 

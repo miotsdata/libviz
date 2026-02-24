@@ -66,7 +66,7 @@ class LoadMzmlBackend(QObject):
             return
 
         query = QSqlQuery(db)
-        if query.exec("SELECT count(*) FROM spectra"):
+        if query.exec("SELECT count(*) FROM spectrum"):
             if query.next():
                 row_count = query.value(0)
                 logger.info("Number of spectra rows: %s", row_count)
@@ -119,7 +119,7 @@ class LoadFromMzmlWorker(QObject):
             # --- Setup table ---
             setup_query = QSqlQuery(db)
             setup_query.exec("""
-                CREATE TABLE IF NOT EXISTS spectra (
+                CREATE TABLE IF NOT EXISTS spectrum (
                     id INTEGER PRIMARY KEY,
                     spectrum_index INTEGER,
                     precursor_mz REAL,
@@ -129,7 +129,7 @@ class LoadFromMzmlWorker(QObject):
                     intensity_array BLOB
                 )
             """)
-            setup_query.exec("CREATE INDEX IF NOT EXISTS idx_spectrum_precursor_mz ON spectra(precursor_mz)")
+            setup_query.exec("CREATE INDEX IF NOT EXISTS idx_spectrum_precursor_mz ON spectrum(precursor_mz)")
             setup_query.finish()  # destroy setup_query
 
             db.transaction()  # begin transaction for bulk insert
@@ -144,7 +144,7 @@ class LoadFromMzmlWorker(QObject):
 
                 insert_query = QSqlQuery(db)
                 insert_query.prepare("""
-                    INSERT INTO spectra
+                    INSERT INTO spectrum
                     (spectrum_index, precursor_mz, collision_energy, polarity, mz_array, intensity_array)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """)
