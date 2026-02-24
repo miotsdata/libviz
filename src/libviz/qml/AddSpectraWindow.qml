@@ -33,8 +33,6 @@ ApplicationWindow {
                     var formula = molecularFormulaText.text
                     var adduct_id = addSpectraPane.adduct_id
 
-                    print("Updating m/z with formula:", formula, "and adduct_id:", adduct_id)
-
                     // disable search if formula or adduct not selected
                     if (!formula || adduct_id === -1) {
                         mzText.text = ""
@@ -99,6 +97,7 @@ ApplicationWindow {
                             bottom: 0 
                             top: 100 
                             }
+                        enabled: !AddSpectraTableModel.querying
                     }
 
                     // Search button
@@ -133,7 +132,6 @@ ApplicationWindow {
                     onCurrentIndexChanged: {
                         if (currentIndex >= 0) {
                             addSpectraPane.adduct_id = AdductListModel.getId(currentIndex);
-                            print("Selected adduct ID:", addSpectraPane.adduct_id);
                         }
                         else
                             addSpectraPane.adduct_id = -1
@@ -172,7 +170,14 @@ ApplicationWindow {
                         model: headerModel
 
                         Rectangle {
-                            width: table.columnWidthProvider(column) // ⭐ key line
+                            width: {
+                                if (column === 0) return 100
+                                if (column === 1) return 120
+                                if (column === 2) return 150
+                                if (column === 3) return 80
+                                if (column === 4) return 120
+                                return 100
+                            }
                             height: 40
                             color: "#dddddd"
                             border.width: 1

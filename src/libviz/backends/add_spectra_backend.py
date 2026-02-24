@@ -12,11 +12,13 @@ class AddSpectraBackend(QObject):
 
     @Slot(str, float, result=float)
     def calculate_mz_from_formula_adduct(self, formula: str, adduct_id: float):
-        if adduct_id == -1:
-            delta = 0
-        else:
-            delta = self.library_service.get_adduct_delta(int(adduct_id))
-        
-        print(f'Delta = {delta}')
+        try:
+            if adduct_id == -1:
+                delta = 0
+            else:
+                delta = self.library_service.get_adduct_delta(int(adduct_id))
 
-        return calculate_exact_mass_formula_adduct(formula, delta)
+            return calculate_exact_mass_formula_adduct(formula, delta)
+        except Exception as e:
+            print("calculate_mz error:", e)
+            return float("nan")   # NEVER raise

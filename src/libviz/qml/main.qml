@@ -149,6 +149,8 @@ ApplicationWindow {
         }
 
         function onSuccessOccurred(path) {
+            statusBar.visible = false;
+            statusText.text = "";
             var component = Qt.createComponent("AddSpectraWindow.qml")
             var window    = component.createObject()
             window.show()

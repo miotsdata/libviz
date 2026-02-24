@@ -27,6 +27,7 @@ class LoadMzmlBackend(QObject):
 
     @Slot(str)
     def load(self, mzml_path: str):
+        logger.warning("LOAD CALLED")
         logger.info("Loading file: %s", mzml_path)
 
         # Tell QML loading started
@@ -121,7 +122,7 @@ class LoadFromMzmlWorker(QObject):
             setup_query.exec("""
                 CREATE TABLE IF NOT EXISTS spectrum (
                     id INTEGER PRIMARY KEY,
-                    spectrum_index INTEGER,
+                    spectrum_index INTEGER UNIQUE,
                     precursor_mz REAL,
                     retention_time REAL,
                     collision_energy REAL,
@@ -135,8 +136,9 @@ class LoadFromMzmlWorker(QObject):
 
             db.transaction()  # begin transaction for bulk insert
 
+            seen = set()
             # --- Stream spectra efficiently ---
-            for idx, spectrum in enumerate(MzMLParser.parse(self._mzml_path)):
+            for _, spectrum in enumerate(MzMLParser.parse(self._mzml_path)):
                 mz = np.round(np.array(spectrum.mz, dtype=np.float32), 4).tobytes()
                 intensity = np.round(np.array(spectrum.intensity, dtype=np.float32), 2).tobytes()
 
@@ -145,12 +147,12 @@ class LoadFromMzmlWorker(QObject):
 
                 insert_query = QSqlQuery(db)
                 insert_query.prepare("""
-                    INSERT INTO spectrum
+                    INSERT OR IGNORE INTO spectrum
                     (spectrum_index, precursor_mz, retention_time, collision_energy, polarity, mz_array, intensity_array)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """)
                 insert_query.addBindValue(int(spectrum.index))
-                insert_query.addBindValue(float(spectrum.precursor_mz))
+                insert_query.addBindValue(round(float(spectrum.precursor_mz), 4))
                 insert_query.addBindValue(float(spectrum.retention_time))
                 insert_query.addBindValue(float(spectrum.collision_energy))
                 insert_query.addBindValue(spectrum.polarity)

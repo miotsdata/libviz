@@ -10,12 +10,14 @@ class AddSpectraTableModel(QSqlQueryModel):
     id, precursor_mz, polarity, collision_energy
     """
     rowCountChanged = Signal()
+    queryingChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._connection_name = None
         self._db_path = None
         self._db = None
+        self._querying = False
 
     # ----------------------------
     # Database Initialization
@@ -39,6 +41,7 @@ class AddSpectraTableModel(QSqlQueryModel):
     # ----------------------------
     @Slot(float, int)
     def refresh(self, mz_value: float, ppm: int):
+        self.set_querying(True)
         if mz_value is None:
             self.setQuery("")  # empty
             return
@@ -60,6 +63,7 @@ class AddSpectraTableModel(QSqlQueryModel):
                    collision_energy
             FROM spectrum
             WHERE precursor_mz BETWEEN {min_mz} AND {max_mz}
+            ORDER BY spectrum_index
         """
 
         if not query.prepare(sql):
@@ -76,13 +80,24 @@ class AddSpectraTableModel(QSqlQueryModel):
         if self.lastError().isValid():
             print("Model error:", self.lastError().text())
 
-        print("Spectra rows loaded:", self.rowCount())
+        print("Spectra rows loaded:", self.rowCountProperty)
 
         self.rowCountChanged.emit()
+        self.set_querying(False)
 
     @Property(int, notify=rowCountChanged)
     def rowCountProperty(self):
         return super().rowCount()
+    
+    @Property(bool, notify=queryingChanged)
+    def querying(self):
+        return self._querying
+    
+    def set_querying(self, value):
+        if self._querying != value:
+            self._querying = value
+            print(f"Querying status changed to {value}")
+            self.queryingChanged.emit()
 
     @Slot(int, result=int)
     def idForRow(self, row: int) -> int:
