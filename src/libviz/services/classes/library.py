@@ -39,8 +39,10 @@ class Library:
                 actual_version=VERSION,
             )
             session.add(meta)
+            session.commit()
 
             populate_adduct_types(session)
+            
 
 
     @classmethod

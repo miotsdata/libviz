@@ -8,6 +8,32 @@ ApplicationWindow {
     height: 480
     visible: true
 
+    Column {
+        anchors.centerIn: parent
+        spacing: 20
+
+        ComboBox {
+            id: adductCombo
+            width: 200
+            model: adductListModel
+            textRole: "formula"
+            onCurrentIndexChanged: {
+                if (currentIndex >= 0) {
+                    console.log("Selected:", adductListModel.getId(currentIndex))
+                }
+            }
+        }
+
+        TextField {
+            id: testTextField
+            width: 200
+            placeholderText: "Enter something..."
+            onEditingFinished: {
+                console.log("TextField editing finished:", text)
+            }
+        }
+    }
+
     header: ToolBar {
         Button {
             text: qsTr("Choose Image...")

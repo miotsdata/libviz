@@ -15,6 +15,7 @@ class AdductListModel(QAbstractListModel):
     
     @Slot()
     def refresh(self):
+        print("Refreshing adduct list model...")
         self.beginResetModel()
         self._data = self.library_service.get_adducts() or []
         self.endResetModel()
@@ -28,6 +29,8 @@ class AdductListModel(QAbstractListModel):
 
         item = self._data[index.row()]
 
+        if role == Qt.DisplayRole:
+            return item["formula"]
         if role == self.IdRole:
             return item["id"]
         if role == self.FormulaRole:
@@ -48,6 +51,7 @@ class AdductListModel(QAbstractListModel):
     @Slot(int, result="int")
     def getId(self, index):
         if 0 <= index < len(self._data):
-            id = self._data[index]["id"]
-            return id
+            id_ = self._data[index]["id"]
+            print(f"getId({index}) -> {id_}")
+            return id_
         return -1

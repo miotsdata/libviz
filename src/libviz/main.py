@@ -40,7 +40,7 @@ def main():
     qmlRegisterSingletonInstance(SpectraTableModel, "Metabolomics.Models", 1, 0, "SpectraTableModel", spectra_table_model)
     qmlRegisterSingletonInstance(SpectrumPlotModel, "Metabolomics.Models", 1, 0, "SpectrumPlotModel", spectrum_plot_model)
     qmlRegisterSingletonInstance(LoadMzmlBackend, "Metabolomics.Models", 1, 0, "LoadMzmlBackend", load_mzml_backend)
-    qmlRegisterSingletonInstance(AddSpectraTableModel, "Metabolomics.Models", 1, 0, "AddSpectraTableModel", add_spectra_table_model)
+    #qmlRegisterSingletonInstance(AddSpectraTableModel, "Metabolomics.Models", 1, 0, "AddSpectraTableModel", add_spectra_table_model)
     qmlRegisterSingletonInstance(AdductListModel, "Metabolomics.Models", 1, 0, "AdductListModel", adduct_list_model)
     qmlRegisterSingletonInstance(AddSpectraBackend, "Metabolomics.Models", 1, 0, "AddSpectraBackend", add_spectra_backend)
 

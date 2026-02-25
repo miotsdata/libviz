@@ -10,6 +10,7 @@ ApplicationWindow {
     width: 800
     height: 600
     minimumWidth: 800
+    minimumHeight: 600
     title: "Add spectra from mzML file"
 
     Pane {
@@ -138,22 +139,22 @@ ApplicationWindow {
                     onEditingFinished: filterByMzColLayout.safeUpdateMZ()
                 }
 
-                // ComboBox {
-                //     id: adductCombo
-                //     Layout.preferredHeight: 40
-                //     model: AdductListModel
-                //     textRole: "formula"
+                ComboBox {
+                    id: adductCombo
+                    Layout.preferredHeight: 40
+                    model: AdductListModel
+                    textRole: "formula"
 
-                //     onCurrentIndexChanged: {
-                //         if (currentIndex >= 0) {
-                //             addSpectraPane.adduct_id = AdductListModel.getId(currentIndex);
-                //         }
-                //         else
-                //             addSpectraPane.adduct_id = -1
+                    onCurrentIndexChanged: {
+                        if (currentIndex >= 0) {
+                            addSpectraPane.adduct_id = AdductListModel.getId(currentIndex);
+                        }
+                        else
+                            addSpectraPane.adduct_id = -1
 
-                //         //filterByMzColLayout.safeUpdateMZ()
-                //     }
-                // }
+                        //filterByMzColLayout.safeUpdateMZ()
+                    }
+                }
             }
 
             ColumnLayout {
