@@ -172,9 +172,6 @@ class LoadFromMzmlWorker(QObject):
             logger.exception("Failed to import mzML")
             self.errorOccurred.emit(str(e))
 
-
-
-
 class MzMLParser:
 
     class Spectrum:

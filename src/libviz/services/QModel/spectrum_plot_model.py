@@ -27,13 +27,13 @@ class SpectrumPlotModel(QSqlQueryModel):
 
         if not self._db.open():
             print("Database open failed:", self._db.lastError().text())
-    
+
     def _decode_array(self, binary_data: bytes) -> np.ndarray:
         """Convert LargeBinary from SQLite to numpy float32 array."""
         if binary_data is None:
             return np.array([], dtype=np.float32)
         return np.frombuffer(binary_data, dtype=np.float32)
-    
+
     def _load_spectrum_from_query(self, query: QSqlQuery) -> tuple[np.ndarray, np.ndarray]:
         """
         Given a QSqlQuery positioned at the right record,

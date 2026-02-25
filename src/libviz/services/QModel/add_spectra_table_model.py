@@ -1,5 +1,8 @@
 # mock_spectra_model.py
 
+import time
+import uuid
+
 from PySide6.QtCore import Slot, Signal, Property # pylint: disable=no-name-in-module
 from PySide6.QtSql import QSqlQueryModel, QSqlQuery, QSqlDatabase # pylint: disable=no-name-in-module
 
@@ -22,7 +25,14 @@ class AddSpectraTableModel(QSqlQueryModel):
     # ----------------------------
     # Database Initialization
     # ----------------------------
-    def _init_database(self):
+    @Slot(str)
+    def set_db(self, db_path: str):
+        self._db_path = db_path
+        self.setQuery("")
+        self.set_querying(False)
+        self._connection_name = f"spectra_model_{uuid.uuid4()}"
+
+
         if QSqlDatabase.contains(self._connection_name):
             self._db = QSqlDatabase.database(self._connection_name)
         else:
@@ -32,25 +42,26 @@ class AddSpectraTableModel(QSqlQueryModel):
         if not self._db.open():
             print("Database open failed:", self._db.lastError().text())
 
-    @Slot(str)
-    def set_db(self, db_path: str):
-        self._db_path = db_path
-
     # ----------------------------
     # Refresh Model
     # ----------------------------
     @Slot(float, int)
     def refresh(self, mz_value: float, ppm: int):
+        if self._querying:
+            print("Already querying — ignoring new request.")
+            return
         self.set_querying(True)
-        if mz_value is None:
+
+        if mz_value is None or not isinstance(mz_value, (int, float)):
+            print("Invalid m/z value:", mz_value)
             self.setQuery("")  # empty
+            self.set_querying(False)
             return
 
         # Calculate range
         min_mz, max_mz = self._calculate_range(mz_value=mz_value, ppm=ppm)
         print(min_mz, max_mz)
 
-        self._init_database()
         query = QSqlQuery(self._db)
 
         # Join with precursor_type to get its name
@@ -80,14 +91,13 @@ class AddSpectraTableModel(QSqlQueryModel):
         if self.lastError().isValid():
             print("Model error:", self.lastError().text())
 
-        print("Spectra rows loaded:", self.rowCountProperty)
-
-        self.rowCountChanged.emit()
+        print("Spectra rows loaded:", super().rowCount())
         self.set_querying(False)
+        self.rowCountChanged.emit()
 
-    @Property(int, notify=rowCountChanged)
-    def rowCountProperty(self):
-        return super().rowCount()
+    @Property(bool, notify=rowCountChanged)
+    def hasRows(self):
+        return super().rowCount() > 0
     
     @Property(bool, notify=queryingChanged)
     def querying(self):
@@ -107,5 +117,5 @@ class AddSpectraTableModel(QSqlQueryModel):
 
     @staticmethod
     def _calculate_range(mz_value: float, ppm: int) -> tuple[float, float]:
-        delta: float = mz_value * ppm / 1_000_00
+        delta: float = mz_value * ppm / 1_000_000
         return (mz_value - delta, mz_value + delta)

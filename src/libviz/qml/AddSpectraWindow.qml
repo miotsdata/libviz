@@ -31,7 +31,8 @@ ApplicationWindow {
                 // 🔹 Central safe updater function
                 function safeUpdateMZ() {
                     var formula = molecularFormulaText.text
-                    var adduct_id = addSpectraPane.adduct_id
+                    //var adduct_id = addSpectraPane.adduct_id
+                    var adduct_id = 1
 
                     // disable search if formula or adduct not selected
                     if (!formula || adduct_id === -1) {
@@ -75,8 +76,10 @@ ApplicationWindow {
                         Layout.preferredWidth: addSpectraWindow.width / 4
                         Layout.preferredHeight: 40
 
-                        Keys.onEscapePressed: focus = false
-                        Keys.onReturnPressed: filterByMzButton.clicked()
+                        Keys.onEscapePressed: function(event) {
+                            event.accepted = true
+                            focus = false
+                        }
 
                         validator: DoubleValidator {
                             bottom: 0.0
@@ -92,21 +95,33 @@ ApplicationWindow {
                         stepSize: 1 
                         Layout.preferredWidth: 120 
                         Layout.preferredHeight: 40 
-                        editable: true 
+                        editable: false 
                         validator: IntValidator { 
                             bottom: 0 
                             top: 100 
                             }
-                        enabled: !AddSpectraTableModel.querying
                     }
 
                     // Search button
+                    Timer {
+                        id: clickDebounce
+                        interval: 400  // milliseconds
+                        repeat: false
+                        onTriggered: filterByMzButton.enabled = true
+                    }
+
                     Button {
                         id: filterByMzButton
                         text: qsTr("Search")
-                        enabled: mzText.text !== ""  // initially disabled
+                        enabled: !AddSpectraTableModel.querying && mzText.acceptableInput
                         onClicked: {
+                            if (!enabled || mzText.text === "")
+                                return // ignore fast clicks
+
+                            //filterByMzButton.enabled = false
                             AddSpectraTableModel.refresh(parseFloat(mzText.text), ppmToleranceSpinBox.value)
+                            //AddSpectraTableModel.refresh(parseFloat(mzText.text), 10)
+                            //clickDebounce.start()
                         }
                     }
                 }
@@ -123,22 +138,22 @@ ApplicationWindow {
                     onEditingFinished: filterByMzColLayout.safeUpdateMZ()
                 }
 
-                ComboBox {
-                    id: adductCombo
-                    Layout.preferredHeight: 40
-                    model: AdductListModel
-                    textRole: "formula"
+                // ComboBox {
+                //     id: adductCombo
+                //     Layout.preferredHeight: 40
+                //     model: AdductListModel
+                //     textRole: "formula"
 
-                    onCurrentIndexChanged: {
-                        if (currentIndex >= 0) {
-                            addSpectraPane.adduct_id = AdductListModel.getId(currentIndex);
-                        }
-                        else
-                            addSpectraPane.adduct_id = -1
+                //     onCurrentIndexChanged: {
+                //         if (currentIndex >= 0) {
+                //             addSpectraPane.adduct_id = AdductListModel.getId(currentIndex);
+                //         }
+                //         else
+                //             addSpectraPane.adduct_id = -1
 
-                        filterByMzColLayout.safeUpdateMZ()
-                    }
-                }
+                //         //filterByMzColLayout.safeUpdateMZ()
+                //     }
+                // }
             }
 
             ColumnLayout {
@@ -197,23 +212,6 @@ ApplicationWindow {
                                 elide: Text.ElideRight
                                 wrapMode: Text.NoWrap
                             }
-
-                            // MouseArea {
-                            //     anchors.fill: parent
-                            //     onClicked: {
-                            //         if (headerRow.lastSortedColumn === column)
-                            //             headerRow.ascending = !headerRow.ascending
-                            //         else {
-                            //             headerRow.lastSortedColumn = column
-                            //             headerRow.ascending = true
-                            //         }
-
-                            //         CompoundTableModel.setSort(
-                            //                     column,
-                            //                     headerRow.ascending ? "asc" : "desc"
-                            //                     )
-                            //     }
-                            // }
                         }
                     }
                 }   
@@ -223,8 +221,11 @@ ApplicationWindow {
                     Layout.fillHeight: true
 
                     TableView {
-                        id: table
+                        id: addSpectraTable
                         anchors.fill: parent
+
+                        property int selectedRow: -1
+                        property int hoveredRow: -1
 
                         model: AddSpectraTableModel
 
@@ -245,6 +246,37 @@ ApplicationWindow {
                             implicitHeight: 35
                             border.width: 0.5
 
+                            // Store row index
+                            required property bool selected
+                            required property bool current
+
+                            // Background for hover
+                            Rectangle {
+                                anchors.fill: parent
+                                color: addSpectraTable.selectedRow === row ? '#e0da20' : (addSpectraTable.hoveredRow === row ? '#a7a7a7' : "#ffffff")
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    addSpectraTable.selectedRow = row
+                                    // model.id refers to the 'id' column of the compound
+                                    // var compound_id = CompoundTableModel.idForRow(table.currentRow)
+                                    // console.log("Clicked compound_id:", compound_id)
+                                    console.log("Clicked row:", row, "column:", column)
+                                    var spectra_id = AddSpectraTableModel.idForRow(row)
+                                    console.log("Clicked spectra_id:", spectra_id)
+                                    //SpectrumPlotModel.setPeakId(spectra_id)
+                                }
+                            }
+
+                            HoverHandler {
+
+                                onHoveredChanged: {
+                                    addSpectraTable.hoveredRow = row
+                                }
+                            }
+
                             Text {
                                 anchors.fill: parent
                                 anchors.margins: 6
@@ -260,7 +292,7 @@ ApplicationWindow {
                     // 🔹 Overlay message
                     Rectangle {
                         anchors.fill: parent
-                        visible: AddSpectraTableModel.rowCountProperty === 0
+                        visible: !AddSpectraTableModel.hasRows
 
                         color: "transparent"
 
