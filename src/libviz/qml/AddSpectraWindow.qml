@@ -116,6 +116,8 @@ ApplicationWindow {
                         text: qsTr("Search")
                         enabled: !AddSpectraTableModel.querying && mzText.acceptableInput
                         onClicked: {
+                            addSpectraTable.selectedRow = -1 // reset selection
+                            SpectrumPlotModelAddSpectra.clear()
                             if (!enabled || mzText.text === "")
                                 return // ignore fast clicks
 
@@ -459,6 +461,59 @@ ApplicationWindow {
                     }
                 }
             }
+            }
+            Button {
+                text: "Add"
+                enabled: addSpectraTable.selectedRow !== -1
+                onClicked: addDialog.open()
+
+                Layout.preferredWidth: 100
+                Layout.preferredHeight: 40
+            }
+        }
+    }
+
+    Dialog {
+        id: addDialog
+        modal: true
+        title: "Add Spectra"
+        width: 400
+        height: 500
+
+        parent: addSpectraWindow.contentItem
+
+        x: (parent.width - width) / 2
+        y: (parent.height - height) / 2
+
+        standardButtons: Dialog.Ok | Dialog.Cancel
+
+        onAccepted: {
+            console.log("Accepted")
+        }
+
+        onRejected: {
+            console.log("Cancelled")
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 10
+            
+            anchors.fill: parent
+            anchors.margins: 20
+
+            TextField {
+                id: compoundNameField
+                placeholderText: "Compound name"
+            }
+
+            TextField {
+                id: formulaField
+                placeholderText: "Molecular formula"
+            }
+
+            TextField {
+                id: inchiKeyField
+                placeholderText: "InChIKey"
             }
         }
     }

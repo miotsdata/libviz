@@ -125,3 +125,10 @@ class SpectrumPlotModel(QSqlQueryModel):
         if self._peak_id != peak_id:
             self._peak_id = peak_id
             self.refresh()
+
+    @Slot()
+    def clear(self):
+        self._peaks = []
+        self._min_mz = 0
+        self._max_mz = 0
+        self.dataChanged.emit()
