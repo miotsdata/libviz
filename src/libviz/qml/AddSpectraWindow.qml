@@ -38,7 +38,7 @@ ApplicationWindow {
                     // disable search if formula or adduct not selected
                     if (!formula || adduct_id === -1) {
                         mzText.text = ""
-                        filterByMzButton.enabled = false
+                        //filterByMzButton.enabled = false
                         return
                     }
 
@@ -55,7 +55,7 @@ ApplicationWindow {
                     } catch (e) {
                         console.log("Error calculating m/z:", e)
                         mzText.text = ""
-                        filterByMzButton.enabled = false
+                        //filterByMzButton.enabled = false
                     }
                 }
 
@@ -136,25 +136,47 @@ ApplicationWindow {
 
                     Keys.onEscapePressed: focus = false
 
-                    onEditingFinished: filterByMzColLayout.safeUpdateMZ()
+                    //onEditingFinished: filterByMzColLayout.safeUpdateMZ()
                 }
 
-                ComboBox {
-                    id: adductCombo
-                    Layout.preferredHeight: 40
-                    model: AdductListModel
-                    textRole: "formula"
+                // ListView {
+                //     model: AdductListModel
+                //     height: 150
+                //     Layout.fillWidth: true
+                //     clip: true
 
-                    onCurrentIndexChanged: {
-                        if (currentIndex >= 0) {
-                            addSpectraPane.adduct_id = AdductListModel.getId(currentIndex);
-                        }
-                        else
-                            addSpectraPane.adduct_id = -1
+                //     delegate: Rectangle {
+                //         height: 40
+                //         width: 40
 
-                        //filterByMzColLayout.safeUpdateMZ()
-                    }
-                }
+                //         Text {
+                //             text: model.formula
+                //             anchors.centerIn: parent
+                //         }
+
+                //         MouseArea {
+                //             anchors.fill: parent
+                //             onClicked: {
+                //                 print("Selected adduct index:", index, "id:", model.id)
+                //                 addSpectraPane.adduct_id = model.id
+                //                 filterByMzColLayout.safeUpdateMZ()
+                //             }
+                //         }
+                //     }
+                //     ScrollBar.vertical: ScrollBar {}
+                // }
+
+                // ComboBox {
+                //     id: adductCombo
+                //     Layout.preferredHeight: 40
+                //     model: AdductListModel
+                //     textRole: "formula"
+
+                //     onActivated: {
+                //         addSpectraPane.adduct_id = AdductListModel.getId(currentIndex);
+                //         filterByMzColLayout.safeUpdateMZ()
+                //     }
+                // }
             }
 
             ColumnLayout {
@@ -233,6 +255,7 @@ ApplicationWindow {
                         clip: true
                         columnSpacing: 1
                         rowSpacing: 1
+                    
 
                         columnWidthProvider: function(column) {
                             if (column === 0) return 100
@@ -289,22 +312,24 @@ ApplicationWindow {
 
                         ScrollBar.vertical: ScrollBar {}
                     }
+                }
 
-                    // 🔹 Overlay message
-                    Rectangle {
-                        anchors.fill: parent
-                        visible: !AddSpectraTableModel.hasRows
+                // 🔹 Overlay message
+                Rectangle {
+                    anchors.fill: parent
+                    visible: !AddSpectraTableModel.hasRows
+                    z: 1
 
-                        color: "transparent"
+                    color: "transparent"
 
-                        Text {
-                            anchors.centerIn: parent
-                            text: "No spectra found"
-                            font.pixelSize: 18
-                            color: "#666666"
-                        }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "No spectra found"
+                        font.pixelSize: 18
+                        color: "#666666"
                     }
                 }
+                
             }
         }
     }

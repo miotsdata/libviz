@@ -47,8 +47,6 @@ class AddSpectraTableModel(QSqlQueryModel):
     # ----------------------------
     @Slot(float, int)
     def refresh(self, mz_value: float, ppm: int):
-        print("Refreshing")
-        return
         if self._querying:
             print("Already querying — ignoring new request.")
             return
