@@ -14,6 +14,7 @@ class AddSpectraTableModel(QSqlQueryModel):
     """
     rowCountChanged = Signal()
     queryingChanged = Signal()
+    dbChanged = Signal(str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -41,6 +42,10 @@ class AddSpectraTableModel(QSqlQueryModel):
 
         if not self._db.open():
             print("Database open failed:", self._db.lastError().text())
+        else:
+            print("Database opened successfully:", self._db_path)
+            self.dbChanged.emit(self._connection_name, self._db_path)
+
 
     # ----------------------------
     # Refresh Model

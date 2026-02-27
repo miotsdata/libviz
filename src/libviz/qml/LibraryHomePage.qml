@@ -328,7 +328,7 @@ Page {
                                 console.log("Clicked row:", row, "column:", column)
                                 var spectra_id = SpectraTableModel.idForRow(row)
                                 console.log("Clicked spectra_id:", spectra_id)
-                                SpectrumPlotModel.setPeakId(spectra_id)
+                                SpectrumPlotModelLibraryHome.setPeakId(spectra_id)
                             }
                         }
 
@@ -368,7 +368,7 @@ Page {
                     Canvas {
                         id: canvas
                         anchors.fill: parent
-                        property var model: SpectrumPlotModel
+                        property var model: SpectrumPlotModelLibraryHome
 
                         onModelChanged: canvas.requestPaint()
 
@@ -467,7 +467,7 @@ Page {
                         }
                     }
                     Connections {
-                        target: SpectrumPlotModel
+                        target: SpectrumPlotModelLibraryHome
                         function onDataChanged() {
                             canvas.requestPaint()
                         }

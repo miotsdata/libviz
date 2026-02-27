@@ -179,36 +179,89 @@ ApplicationWindow {
                 // }
             }
 
-            ColumnLayout {
-                Layout.fillWidth: true
+            RowLayout {
                 Layout.preferredHeight: addSpectraWindow.height / 3
+                Layout.fillWidth: true
 
-                
-
-                ListModel {
-                    id: headerModel
-                    ListElement { label: "ID"; column: 0 }
-                    ListElement { label: "spectrum_index"; column: 1 }
-                    ListElement { label: "precursor_mz"; column: 2 }
-                    ListElement { label: "retention_time"; column: 3 }
-                    ListElement { label: "Polarity"; column: 4 }
-                    ListElement { label: "collision_energy"; column: 5 }
-                }
-
-                Row {
-                    
-                    id: headerRow
+                ColumnLayout {
                     Layout.fillWidth: true
-                    height: 40
+                    
 
-                    property int lastSortedColumn: -1
-                    property bool ascending: true
+                    
 
-                    Repeater {
-                        model: headerModel
+                    ListModel {
+                        id: headerModel
+                        ListElement { label: "ID"; column: 0 }
+                        ListElement { label: "spectrum_index"; column: 1 }
+                        ListElement { label: "precursor_mz"; column: 2 }
+                        ListElement { label: "retention_time"; column: 3 }
+                        ListElement { label: "Polarity"; column: 4 }
+                        ListElement { label: "collision_energy"; column: 5 }
+                    }
 
-                        Rectangle {
-                            width: {
+                    Row {
+                        
+                        id: headerRow
+                        Layout.fillWidth: true
+                        height: 40
+
+                        property int lastSortedColumn: -1
+                        property bool ascending: true
+
+                        Repeater {
+                            model: headerModel
+
+                            Rectangle {
+                                width: {
+                                    if (column === 0) return 100
+                                    if (column === 1) return 120
+                                    if (column === 2) return 150
+                                    if (column === 3) return 80
+                                    if (column === 4) return 120
+                                    return 100
+                                }
+                                height: 40
+                                color: "#dddddd"
+                                border.width: 1
+
+                                required property string label
+                                required property int column
+
+                                Text {
+                                    anchors.fill: parent
+                                    anchors.margins: 6
+
+                                    text: label
+                                    font.bold: true
+                                    horizontalAlignment: Text.AlignLeft
+                                    verticalAlignment: Text.AlignVCenter
+
+                                    elide: Text.ElideRight
+                                    wrapMode: Text.NoWrap
+                                }
+                            }
+                        }
+                    }   
+
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+
+                        TableView {
+                            id: addSpectraTable
+                            anchors.fill: parent
+
+                            property int selectedRow: -1
+                            property int hoveredRow: -1
+
+                            model: AddSpectraTableModel
+
+                            clip: true
+                            columnSpacing: 1
+                            rowSpacing: 1
+                        
+
+                            columnWidthProvider: function(column) {
                                 if (column === 0) return 100
                                 if (column === 1) return 120
                                 if (column === 2) return 150
@@ -216,120 +269,196 @@ ApplicationWindow {
                                 if (column === 4) return 120
                                 return 100
                             }
-                            height: 40
-                            color: "#dddddd"
-                            border.width: 1
 
-                            required property string label
-                            required property int column
+                            delegate: Rectangle {
+                                implicitHeight: 35
+                                border.width: 0.5
 
-                            Text {
-                                anchors.fill: parent
-                                anchors.margins: 6
+                                // Store row index
+                                required property bool selected
+                                required property bool current
 
-                                text: label
-                                font.bold: true
-                                horizontalAlignment: Text.AlignLeft
-                                verticalAlignment: Text.AlignVCenter
+                                // Background for hover
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: addSpectraTable.selectedRow === row ? '#e0da20' : (addSpectraTable.hoveredRow === row ? '#a7a7a7' : "#ffffff")
+                                }
 
-                                elide: Text.ElideRight
-                                wrapMode: Text.NoWrap
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        addSpectraTable.selectedRow = row
+                                        // model.id refers to the 'id' column of the compound
+                                        console.log("Clicked row:", row, "column:", column)
+                                        var spectra_id = AddSpectraTableModel.idForRow(row)
+                                        console.log("Clicked spectra_id:", spectra_id)
+                                        SpectrumPlotModelAddSpectra.setPeakId(spectra_id)
+                                    }
+                                }
+
+                                HoverHandler {
+
+                                    onHoveredChanged: {
+                                        addSpectraTable.hoveredRow = row
+                                    }
+                                }
+
+                                Text {
+                                    anchors.fill: parent
+                                    anchors.margins: 6
+                                    text: model.display
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                }
                             }
+
+                            ScrollBar.vertical: ScrollBar {}
                         }
                     }
-                }   
+
+                    // 🔹 Overlay message
+                    Rectangle {
+                        anchors.fill: parent
+                        visible: !AddSpectraTableModel.hasRows
+                        z: 1
+
+                        color: "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "No spectra found"
+                            font.pixelSize: 18
+                            color: "#666666"
+                        }
+                    }
+                    
+                }
+
+                ColumnLayout {
+                Layout.preferredWidth: window.width / 3
+                Layout.fillHeight: true
+                spacing: 10
+
+                Label {
+                    text: "MS/MS Spectrum"
+                    font.bold: true
+                }
 
                 Item {
+                    id: plotContainerAddSpectra
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-
-                    TableView {
-                        id: addSpectraTable
-                        anchors.fill: parent
-
-                        property int selectedRow: -1
-                        property int hoveredRow: -1
-
-                        model: AddSpectraTableModel
-
-                        clip: true
-                        columnSpacing: 1
-                        rowSpacing: 1
                     
 
-                        columnWidthProvider: function(column) {
-                            if (column === 0) return 100
-                            if (column === 1) return 120
-                            if (column === 2) return 150
-                            if (column === 3) return 80
-                            if (column === 4) return 120
-                            return 100
-                        }
+                    Canvas {
+                        id: canvasAddSpectra
+                        anchors.fill: parent
+                        property var model: SpectrumPlotModelAddSpectra
 
-                        delegate: Rectangle {
-                            implicitHeight: 35
-                            border.width: 0.5
+                        onModelChanged: canvasAddSpectra.requestPaint()
 
-                            // Store row index
-                            required property bool selected
-                            required property bool current
+                        onPaint: {
+                            const ctx = getContext("2d")
+                            ctx.clearRect(0, 0, width, height)
 
-                            // Background for hover
-                            Rectangle {
-                                anchors.fill: parent
-                                color: addSpectraTable.selectedRow === row ? '#e0da20' : (addSpectraTable.hoveredRow === row ? '#a7a7a7' : "#ffffff")
+                            if (!model)
+                                return
+
+                            const peaks = model.peaks
+                            if (!peaks || peaks.length === 0)
+                                return
+
+                            const minMz = model.minMz - 5
+                            const maxMz = model.maxMz + 5
+
+                            // ---- Define plotting rectangle ----
+                            const marginLeft = 50
+                            const marginRight = 20
+                            const marginTop = 20
+                            const marginBottom = 40
+
+                            const plotX = marginLeft
+                            const plotY = marginTop
+                            const plotWidth = width - marginLeft - marginRight
+                            const plotHeight = height - marginTop - marginBottom
+
+                            if (plotWidth <= 0 || plotHeight <= 0)
+                                return
+
+                            // ---- Coordinate transforms ----
+                            function xToPixel(mz) {
+                                return plotX + ((mz - minMz) / (maxMz - minMz)) * plotWidth
                             }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: {
-                                    addSpectraTable.selectedRow = row
-                                    // model.id refers to the 'id' column of the compound
-                                    // var compound_id = CompoundTableModel.idForRow(table.currentRow)
-                                    // console.log("Clicked compound_id:", compound_id)
-                                    console.log("Clicked row:", row, "column:", column)
-                                    var spectra_id = AddSpectraTableModel.idForRow(row)
-                                    console.log("Clicked spectra_id:", spectra_id)
-                                    //SpectrumPlotModel.setPeakId(spectra_id)
+                            function yToPixel(intensity) {
+                                return plotY + plotHeight - (intensity / 100.0) * plotHeight
+                            }
+
+                            ctx.strokeStyle = "black"
+                            ctx.fillStyle = "black"
+                            ctx.lineWidth = 1
+
+                            // ---- Draw axes ----
+                            ctx.beginPath()
+                            ctx.moveTo(plotX, plotY)
+                            ctx.lineTo(plotX, plotY + plotHeight)
+                            ctx.lineTo(plotX + plotWidth, plotY + plotHeight)
+                            ctx.stroke()
+
+                            // ---- Y ticks (0–100 every 20) ----
+                            for (let y = 0; y <= 100; y += 20) {
+                                const py = yToPixel(y)
+
+                                ctx.beginPath()
+                                ctx.moveTo(plotX - 5, py)
+                                ctx.lineTo(plotX, py)
+                                ctx.stroke()
+
+                                ctx.fillText(y.toString(), plotX - 35, py + 4)
+                            }
+
+                            // ---- X ticks (5 total) ----
+                            if (maxMz > minMz) {
+                                const step = (maxMz - minMz) / 4.0
+
+                                for (let i = 0; i < 5; i++) {
+                                    const mzValue = minMz + i * step
+                                    const px = xToPixel(mzValue)
+
+                                    ctx.beginPath()
+                                    ctx.moveTo(px, plotY + plotHeight)
+                                    ctx.lineTo(px, plotY + plotHeight + 5)
+                                    ctx.stroke()
+
+                                    ctx.fillText(
+                                                mzValue.toFixed(1),
+                                                px - 20,
+                                                plotY + plotHeight + 20
+                                                )
                                 }
                             }
 
-                            HoverHandler {
+                            ctx.lineWidth = 5;
+                            // ---- Draw peaks (stick spectrum) ----
+                            for (let i = 0; i < peaks.length; i++) {
+                                const px = xToPixel(peaks[i].mz)
+                                const py = yToPixel(peaks[i].intensity)
 
-                                onHoveredChanged: {
-                                    addSpectraTable.hoveredRow = row
-                                }
-                            }
-
-                            Text {
-                                anchors.fill: parent
-                                anchors.margins: 6
-                                text: model.display
-                                verticalAlignment: Text.AlignVCenter
-                                elide: Text.ElideRight
+                                ctx.beginPath()
+                                ctx.moveTo(px, plotY + plotHeight)
+                                ctx.lineTo(px, py)
+                                ctx.stroke()
                             }
                         }
-
-                        ScrollBar.vertical: ScrollBar {}
+                    }
+                    Connections {
+                        target: SpectrumPlotModelAddSpectra
+                        function onDataChanged() {
+                            canvasAddSpectra.requestPaint()
+                        }
                     }
                 }
-
-                // 🔹 Overlay message
-                Rectangle {
-                    anchors.fill: parent
-                    visible: !AddSpectraTableModel.hasRows
-                    z: 1
-
-                    color: "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "No spectra found"
-                        font.pixelSize: 18
-                        color: "#666666"
-                    }
-                }
-                
+            }
             }
         }
     }

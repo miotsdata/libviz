@@ -1,14 +1,12 @@
 from PySide6.QtCore import Property, Signal, Slot # pylint: disable=no-name-in-module
 from PySide6.QtSql import QSqlQueryModel, QSqlQuery, QSqlDatabase # pylint: disable=no-name-in-module
-from libviz.services import LibraryService
 import numpy as np
 
 class SpectrumPlotModel(QSqlQueryModel):
     dataChanged = Signal()
 
-    def __init__(self, library_service, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.library_service: LibraryService = library_service
         self._db = None
         self._peak_id = None
         self._peaks = None
@@ -18,15 +16,27 @@ class SpectrumPlotModel(QSqlQueryModel):
     # ----------------------------
     # Database Initialization
     # ----------------------------
-    def _init_database(self):
-        if QSqlDatabase.contains(self.library_service.connection_name):
-            self._db = QSqlDatabase.database(self.library_service.connection_name)
-        else:
-            self._db = QSqlDatabase.addDatabase("QSQLITE", self.library_service.connection_name)
-            self._db.setDatabaseName(self.library_service.db_path)
+    def init_database(self, connection_name: str, db_path: str):
+
+        if self._db is not None and self._db.databaseName() != db_path:
+            self._db.close()
+            conn_name_2close = self._db.connectionName()
+            del self._db
+            self._db = None
+            QSqlDatabase.removeDatabase(conn_name_2close)
+
+            self._db = QSqlDatabase.addDatabase("QSQLITE",connection_name)
+            self._db.setDatabaseName(db_path)
+        elif  QSqlDatabase.contains(connection_name):
+            self._db = QSqlDatabase.database(connection_name)
+        else:       
+            self._db = QSqlDatabase.addDatabase("QSQLITE", connection_name)
+            self._db.setDatabaseName(db_path)
 
         if not self._db.open():
             print("Database open failed:", self._db.lastError().text())
+        else:
+            print("Database opened successfully:", db_path)
 
     def _decode_array(self, binary_data: bytes) -> np.ndarray:
         """Convert LargeBinary from SQLite to numpy float32 array."""
@@ -57,14 +67,13 @@ class SpectrumPlotModel(QSqlQueryModel):
             self.setQuery("")  # empty
             return
 
-        self._init_database()
         query = QSqlQuery(self._db)
 
         sql = f"""
-            SELECT s.mz_array,
-                s.intensity_array
-            FROM spectrum s
-            WHERE compound_id = {self._peak_id}
+            SELECT mz_array,
+                intensity_array
+            FROM spectrum
+            WHERE id = {self._peak_id}
             LIMIT 1
         """
 

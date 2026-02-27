@@ -25,7 +25,8 @@ def main():
     compound_model = CompoundTableModel(library_service)
     spectra_table_model = SpectraTableModel(library_service)
 
-    spectrum_plot_model = SpectrumPlotModel(library_service)
+    spectrum_plot_model_library_home = SpectrumPlotModel()
+    spectrum_plot_model_add_spectra = SpectrumPlotModel()
     
 
     load_mzml_backend = LoadMzmlBackend()
@@ -36,21 +37,28 @@ def main():
 
     add_spectra_backend = AddSpectraBackend(library_service)
 
+    load_library_backend = LoadLibraryBackend(library_service)
+
     qmlRegisterSingletonInstance(CompoundTableModel, "Metabolomics.Models", 1, 0, "CompoundTableModel", compound_model)
     qmlRegisterSingletonInstance(SpectraTableModel, "Metabolomics.Models", 1, 0, "SpectraTableModel", spectra_table_model)
-    qmlRegisterSingletonInstance(SpectrumPlotModel, "Metabolomics.Models", 1, 0, "SpectrumPlotModel", spectrum_plot_model)
+    qmlRegisterSingletonInstance(SpectrumPlotModel, "Metabolomics.Models", 1, 0, "SpectrumPlotModelLibraryHome", spectrum_plot_model_library_home)
+    qmlRegisterSingletonInstance(SpectrumPlotModel, "Metabolomics.Models", 1, 0, "SpectrumPlotModelAddSpectra", spectrum_plot_model_add_spectra)
     qmlRegisterSingletonInstance(LoadMzmlBackend, "Metabolomics.Models", 1, 0, "LoadMzmlBackend", load_mzml_backend)
     qmlRegisterSingletonInstance(AddSpectraTableModel, "Metabolomics.Models", 1, 0, "AddSpectraTableModel", add_spectra_table_model)
     qmlRegisterSingletonInstance(AdductListModel, "Metabolomics.Models", 1, 0, "AdductListModel", adduct_list_model)
     qmlRegisterSingletonInstance(AddSpectraBackend, "Metabolomics.Models", 1, 0, "AddSpectraBackend", add_spectra_backend)
+    qmlRegisterSingletonInstance(LoadLibraryBackend, "Metabolomics.Models", 1, 0, "LoadLibraryBackend", load_library_backend)
+    qmlRegisterSingletonInstance(CreateLibraryBackend, "Metabolomics.Models", 1, 0, "CreateLibraryBackend", create_library_backend)
 
 
     library_service.libraryChanged.connect(compound_model.refresh)
     load_mzml_backend.successOccurred.connect(add_spectra_table_model.set_db)
+    add_spectra_table_model.dbChanged.connect(spectrum_plot_model_add_spectra.init_database)
     library_service.libraryChanged.connect(adduct_list_model.refresh)
+    load_library_backend.loadedLibrarySuccessfully.connect(spectrum_plot_model_library_home.init_database)
 
     engine = QQmlApplicationEngine()
-    load_library_backend = LoadLibraryBackend(library_service, engine)
+    
     app_state = AppState()
     navigation = Navigation()
 
@@ -60,7 +68,6 @@ def main():
     # Create library service + backend
     # Expose backend to QML
     engine.rootContext().setContextProperty("createLibBackend", create_library_backend)
-    engine.rootContext().setContextProperty("loadLibBackend", load_library_backend)
 
     engine.rootContext().setContextProperty("libraryService", library_service)
 

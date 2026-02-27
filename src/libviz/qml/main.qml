@@ -28,9 +28,9 @@ ApplicationWindow {
             MenuItem {
                 text: "Load library from .msp"
                 onTriggered: {
-                    var path = loadLibBackend.selectPathMsp();
+                    var path = LoadLibraryBackend.selectPathMsp();
                     if (path !== "") {
-                        loadLibBackend.loadLibraryFromMsp(path);
+                        LoadLibraryBackend.loadLibraryFromMsp(path);
                     }
                 }
             }
@@ -119,14 +119,14 @@ ApplicationWindow {
     // LOAD LIBRARY CONNECTIONS
     // =========================
     Connections {
-        target: loadLibBackend
+        target: LoadLibraryBackend
 
         function onLibraryLoading(path) {
             statusBar.visible = true;
             statusText.text = "Loading \"" + path + "\"";
         }
 
-        function onSuccessOccurred() {
+        function onLoadedLibrarySuccessfully(connection_name, db_path) {
             statusBar.visible = false;
             statusText.text = "";
             console.log("SUCCESS SIGNAL RECEIVED");
