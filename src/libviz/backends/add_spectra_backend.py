@@ -8,7 +8,7 @@ class AddSpectraBackend(QObject):
 
     def __init__(self, library_service: LibraryService):
         super().__init__()
-        self.library_service = library_service
+        self.library_service: LibraryService = library_service
 
     @Slot(str, float, result=float)
     def calculate_mz_from_formula_adduct(self, formula: str, adduct_id: float):
@@ -22,3 +22,17 @@ class AddSpectraBackend(QObject):
         except Exception as e:
             print("calculate_mz error:", e)
             return float("nan")   # NEVER raise
+        
+    @Slot(str, str, str, "QVariantMap")
+    def addSpectraToLibrary(self, compound_name: str, compound_formula: str, inchikey: str, spectra_info: dict):
+        try:
+            self.library_service.add_spectra_to_library(
+                compound_name,
+                compound_formula,
+                inchikey,
+                spectra_info
+            )
+            print("Spectra added to library successfully.")
+        except Exception as e:
+            print("Error adding spectra to library:", e)
+            self.errorOccurred.emit()

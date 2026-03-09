@@ -124,3 +124,37 @@ class AddSpectraTableModel(QSqlQueryModel):
     def _calculate_range(mz_value: float, ppm: int) -> tuple[float, float]:
         delta: float = mz_value * ppm / 1_000_000
         return (mz_value - delta, mz_value + delta)
+    
+    @Slot(int, result="QVariantMap")
+    def getSpectraInfoById(self, peak_id: int):
+        query = QSqlQuery(self._db)
+
+        sql = f"""
+            SELECT precursor_mz,
+                   retention_time,
+                   polarity,
+                   collision_energy
+            FROM spectrum
+            WHERE id = {peak_id}
+            LIMIT 1
+        """
+
+        if not query.exec(sql):
+            print("Query failed:", query.lastError().text())
+            return None
+
+        if not query.next():
+            print("No spectrum found with id:", peak_id)
+            return None
+
+        precursor_mz = query.value(0)
+        retention_time = query.value(1)
+        polarity = query.value(2)
+        collision_energy = query.value(3)
+
+        return {
+            "precursor_mz": precursor_mz,
+            "retention_time": retention_time,
+            "polarity": polarity,
+            "collision_energy": collision_energy
+        }

@@ -261,3 +261,38 @@ class Library:
             if adduct is None:
                 raise ValueError(f"Adduct with ID {adduct_id} not found")
             return adduct.delta_mass
+
+    def add_spectra(self, compound_name: str, compound_formula: str, inchikey: str, spectra_info: dict):
+        with self.session_scope() as session:
+            # Check if compound already exists
+            compound = None
+            if inchikey:
+                compound = session.query(Compound).filter_by(inchikey=inchikey).one_or_none()
+
+            if compound is None:
+                compound = Compound(
+                    name=compound_name,
+                    formula=compound_formula,
+                    inchikey=inchikey,
+                    exact_mass=calculate_exact_mass(compound_formula),
+                )
+                session.add(compound)
+                session.flush()  # get compound.id
+
+            # Add spectrum
+            adduct_id = spectra_info.get("adduct_id")
+            if adduct_id is None:
+                raise ValueError("adduct_id is required in spectra_info")
+
+            spectrum = Spectrum.from_arrays(
+                compound_id=compound.id,
+                precursor_mz=spectra_info["precursor_mz"],
+                adduct_type_id=adduct_id,
+                polarity=spectra_info["polarity"],
+                collision_energy=spectra_info["collision_energy"],
+                mz=np.array(spectra_info["mz"], dtype=np.float32).tobytes(),
+                intensity=np.array(spectra_info["intensity"], dtype=np.float32).tobytes(),
+            )
+
+            session.add(spectrum)
+            session.commit()  # commit to get spectrum.id

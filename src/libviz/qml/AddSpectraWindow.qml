@@ -140,45 +140,6 @@ ApplicationWindow {
 
                     //onEditingFinished: filterByMzColLayout.safeUpdateMZ()
                 }
-
-                // ListView {
-                //     model: AdductListModel
-                //     height: 150
-                //     Layout.fillWidth: true
-                //     clip: true
-
-                //     delegate: Rectangle {
-                //         height: 40
-                //         width: 40
-
-                //         Text {
-                //             text: model.formula
-                //             anchors.centerIn: parent
-                //         }
-
-                //         MouseArea {
-                //             anchors.fill: parent
-                //             onClicked: {
-                //                 print("Selected adduct index:", index, "id:", model.id)
-                //                 addSpectraPane.adduct_id = model.id
-                //                 filterByMzColLayout.safeUpdateMZ()
-                //             }
-                //         }
-                //     }
-                //     ScrollBar.vertical: ScrollBar {}
-                // }
-
-                // ComboBox {
-                //     id: adductCombo
-                //     Layout.preferredHeight: 40
-                //     model: AdductListModel
-                //     textRole: "formula"
-
-                //     onActivated: {
-                //         addSpectraPane.adduct_id = AdductListModel.getId(currentIndex);
-                //         filterByMzColLayout.safeUpdateMZ()
-                //     }
-                // }
             }
 
             RowLayout {
@@ -255,6 +216,7 @@ ApplicationWindow {
 
                             property int selectedRow: -1
                             property int hoveredRow: -1
+                            property var spectra_id
 
                             model: AddSpectraTableModel
 
@@ -292,9 +254,9 @@ ApplicationWindow {
                                         addSpectraTable.selectedRow = row
                                         // model.id refers to the 'id' column of the compound
                                         console.log("Clicked row:", row, "column:", column)
-                                        var spectra_id = AddSpectraTableModel.idForRow(row)
-                                        console.log("Clicked spectra_id:", spectra_id)
-                                        SpectrumPlotModelAddSpectra.setPeakId(spectra_id)
+                                        addSpectraTable.spectra_id = AddSpectraTableModel.idForRow(row)
+                                        console.log("Clicked spectra_id:", addSpectraTable.spectra_id)
+                                        SpectrumPlotModelAddSpectra.setPeakId(addSpectraTable.spectra_id)
                                     }
                                 }
 
@@ -337,130 +299,130 @@ ApplicationWindow {
                 }
 
                 ColumnLayout {
-                Layout.preferredWidth: window.width / 3
-                Layout.fillHeight: true
-                spacing: 10
-
-                Label {
-                    text: "MS/MS Spectrum"
-                    font.bold: true
-                }
-
-                Item {
-                    id: plotContainerAddSpectra
-                    Layout.fillWidth: true
+                    Layout.preferredWidth: window.width / 3
                     Layout.fillHeight: true
-                    
+                    spacing: 10
 
-                    Canvas {
-                        id: canvasAddSpectra
-                        anchors.fill: parent
-                        property var model: SpectrumPlotModelAddSpectra
+                    Label {
+                        text: "MS/MS Spectrum"
+                        font.bold: true
+                    }
 
-                        onModelChanged: canvasAddSpectra.requestPaint()
+                    Item {
+                        id: plotContainerAddSpectra
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        
 
-                        onPaint: {
-                            const ctx = getContext("2d")
-                            ctx.clearRect(0, 0, width, height)
+                        Canvas {
+                            id: canvasAddSpectra
+                            anchors.fill: parent
+                            property var model: SpectrumPlotModelAddSpectra
 
-                            if (!model)
-                                return
+                            onModelChanged: canvasAddSpectra.requestPaint()
 
-                            const peaks = model.peaks
-                            if (!peaks || peaks.length === 0)
-                                return
+                            onPaint: {
+                                const ctx = getContext("2d")
+                                ctx.clearRect(0, 0, width, height)
 
-                            const minMz = model.minMz - 5
-                            const maxMz = model.maxMz + 5
+                                if (!model)
+                                    return
 
-                            // ---- Define plotting rectangle ----
-                            const marginLeft = 50
-                            const marginRight = 20
-                            const marginTop = 20
-                            const marginBottom = 40
+                                const peaks = model.peaks
+                                if (!peaks || peaks.length === 0)
+                                    return
 
-                            const plotX = marginLeft
-                            const plotY = marginTop
-                            const plotWidth = width - marginLeft - marginRight
-                            const plotHeight = height - marginTop - marginBottom
+                                const minMz = model.minMz - 5
+                                const maxMz = model.maxMz + 5
 
-                            if (plotWidth <= 0 || plotHeight <= 0)
-                                return
+                                // ---- Define plotting rectangle ----
+                                const marginLeft = 50
+                                const marginRight = 20
+                                const marginTop = 20
+                                const marginBottom = 40
 
-                            // ---- Coordinate transforms ----
-                            function xToPixel(mz) {
-                                return plotX + ((mz - minMz) / (maxMz - minMz)) * plotWidth
-                            }
+                                const plotX = marginLeft
+                                const plotY = marginTop
+                                const plotWidth = width - marginLeft - marginRight
+                                const plotHeight = height - marginTop - marginBottom
 
-                            function yToPixel(intensity) {
-                                return plotY + plotHeight - (intensity / 100.0) * plotHeight
-                            }
+                                if (plotWidth <= 0 || plotHeight <= 0)
+                                    return
 
-                            ctx.strokeStyle = "black"
-                            ctx.fillStyle = "black"
-                            ctx.lineWidth = 1
+                                // ---- Coordinate transforms ----
+                                function xToPixel(mz) {
+                                    return plotX + ((mz - minMz) / (maxMz - minMz)) * plotWidth
+                                }
 
-                            // ---- Draw axes ----
-                            ctx.beginPath()
-                            ctx.moveTo(plotX, plotY)
-                            ctx.lineTo(plotX, plotY + plotHeight)
-                            ctx.lineTo(plotX + plotWidth, plotY + plotHeight)
-                            ctx.stroke()
+                                function yToPixel(intensity) {
+                                    return plotY + plotHeight - (intensity / 100.0) * plotHeight
+                                }
 
-                            // ---- Y ticks (0–100 every 20) ----
-                            for (let y = 0; y <= 100; y += 20) {
-                                const py = yToPixel(y)
+                                ctx.strokeStyle = "black"
+                                ctx.fillStyle = "black"
+                                ctx.lineWidth = 1
 
+                                // ---- Draw axes ----
                                 ctx.beginPath()
-                                ctx.moveTo(plotX - 5, py)
-                                ctx.lineTo(plotX, py)
+                                ctx.moveTo(plotX, plotY)
+                                ctx.lineTo(plotX, plotY + plotHeight)
+                                ctx.lineTo(plotX + plotWidth, plotY + plotHeight)
                                 ctx.stroke()
 
-                                ctx.fillText(y.toString(), plotX - 35, py + 4)
-                            }
+                                // ---- Y ticks (0–100 every 20) ----
+                                for (let y = 0; y <= 100; y += 20) {
+                                    const py = yToPixel(y)
 
-                            // ---- X ticks (5 total) ----
-                            if (maxMz > minMz) {
-                                const step = (maxMz - minMz) / 4.0
+                                    ctx.beginPath()
+                                    ctx.moveTo(plotX - 5, py)
+                                    ctx.lineTo(plotX, py)
+                                    ctx.stroke()
 
-                                for (let i = 0; i < 5; i++) {
-                                    const mzValue = minMz + i * step
-                                    const px = xToPixel(mzValue)
+                                    ctx.fillText(y.toString(), plotX - 35, py + 4)
+                                }
+
+                                // ---- X ticks (5 total) ----
+                                if (maxMz > minMz) {
+                                    const step = (maxMz - minMz) / 4.0
+
+                                    for (let i = 0; i < 5; i++) {
+                                        const mzValue = minMz + i * step
+                                        const px = xToPixel(mzValue)
+
+                                        ctx.beginPath()
+                                        ctx.moveTo(px, plotY + plotHeight)
+                                        ctx.lineTo(px, plotY + plotHeight + 5)
+                                        ctx.stroke()
+
+                                        ctx.fillText(
+                                                    mzValue.toFixed(1),
+                                                    px - 20,
+                                                    plotY + plotHeight + 20
+                                                    )
+                                    }
+                                }
+
+                                ctx.lineWidth = 5;
+                                // ---- Draw peaks (stick spectrum) ----
+                                for (let i = 0; i < peaks.length; i++) {
+                                    const px = xToPixel(peaks[i].mz)
+                                    const py = yToPixel(peaks[i].intensity)
 
                                     ctx.beginPath()
                                     ctx.moveTo(px, plotY + plotHeight)
-                                    ctx.lineTo(px, plotY + plotHeight + 5)
+                                    ctx.lineTo(px, py)
                                     ctx.stroke()
-
-                                    ctx.fillText(
-                                                mzValue.toFixed(1),
-                                                px - 20,
-                                                plotY + plotHeight + 20
-                                                )
                                 }
                             }
-
-                            ctx.lineWidth = 5;
-                            // ---- Draw peaks (stick spectrum) ----
-                            for (let i = 0; i < peaks.length; i++) {
-                                const px = xToPixel(peaks[i].mz)
-                                const py = yToPixel(peaks[i].intensity)
-
-                                ctx.beginPath()
-                                ctx.moveTo(px, plotY + plotHeight)
-                                ctx.lineTo(px, py)
-                                ctx.stroke()
-                            }
                         }
-                    }
-                    Connections {
-                        target: SpectrumPlotModelAddSpectra
-                        function onDataChanged() {
-                            canvasAddSpectra.requestPaint()
+                        Connections {
+                            target: SpectrumPlotModelAddSpectra
+                            function onDataChanged() {
+                                canvasAddSpectra.requestPaint()
+                            }
                         }
                     }
                 }
-            }
             }
             Button {
                 text: "Add"
@@ -488,7 +450,26 @@ ApplicationWindow {
         standardButtons: Dialog.Ok | Dialog.Cancel
 
         onAccepted: {
-            console.log("Accepted")
+            console.log("Accepted");
+            SpectrumPlotModelAddSpectra.clear();
+            addSpectraTable.selectedRow = -1;
+
+            var spectra_id = addSpectraTable.spectra_id;
+            addSpectraTable.spectra_id = null;
+
+            var inchikey = inchiKeyField.text.trim();
+            var compound_formula = formulaField.text.trim();
+            var compound_name = compoundNameField.text.trim();
+
+            var spectraInfo = AddSpectraTableModel.getSpectraInfoById(spectra_id);
+
+            AddSpectraBackend.addSpectraToLibrary(
+                compound_name,
+                compound_formula,
+                inchikey,
+                spectraInfo
+            );
+
         }
 
         onRejected: {
@@ -502,16 +483,19 @@ ApplicationWindow {
             anchors.margins: 20
 
             TextField {
+                Layout.fillWidth: true
                 id: compoundNameField
                 placeholderText: "Compound name"
             }
 
             TextField {
+                Layout.fillWidth: true
                 id: formulaField
                 placeholderText: "Molecular formula"
             }
 
             TextField {
+                Layout.fillWidth: true
                 id: inchiKeyField
                 placeholderText: "InChIKey"
             }
