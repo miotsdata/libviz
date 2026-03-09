@@ -54,11 +54,13 @@ class Spectrum(Base):
         mz: np.ndarray,
         intensity: np.ndarray,
     ):
+        
         mz = np.asarray(mz, dtype=np.float32)
         intensity = np.asarray(intensity, dtype=np.float32)
         order = np.argsort(mz)
         mz = np.round(mz[order], 4)
         intensity = np.round(intensity[order], 2)
+
 
         return cls(
             compound_id=compound_id,

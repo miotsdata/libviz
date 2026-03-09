@@ -69,8 +69,8 @@ class LibraryService(QObject):
             return self._library.get_adduct_delta(adduct_id)
         raise ValueError("No library loaded")
     
-    def add_spectra_to_library(self, compound_name: str, compound_formula: str, inchikey: str, spectra_info: dict):
+    def add_spectra_to_library(self, compound_name: str, compound_formula: str, inchikey: str, spectra_info: dict, adduct_id: float):
         if not self._library:
             raise ValueError("No library loaded")
-        self._library.add_spectra(compound_name, compound_formula, inchikey, spectra_info)
+        self._library.add_spectra(compound_name, compound_formula, inchikey, spectra_info, adduct_id)
         self.libraryChanged.emit(self._library.name, self._library.n_compounds, self._library.n_spectra)

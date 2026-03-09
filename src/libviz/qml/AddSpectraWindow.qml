@@ -593,7 +593,8 @@ ApplicationWindow {
                 compound_name,
                 compound_formula,
                 inchikey,
-                spectraInfo
+                spectraInfo,
+                addSpectraPane.adduct_id
             );
 
         }
@@ -625,6 +626,27 @@ ApplicationWindow {
                 id: inchiKeyField
                 placeholderText: "InChIKey"
             }
+
+            RowLayout {
+                spacing: 10
+
+                Label {
+                    text: "Adduct:"
+                    font.bold: true
+                }
+
+                Label {
+                    id: selectedAdductLabelAdd
+                    text: addSpectraPane.adduct_formula || "None selected"
+                    Layout.minimumWidth: 100
+                }
+
+                Button {
+                    text: "Select…"
+                    onClicked: adductDialog.open()
+                }
+            }
+
         }
     }
 }

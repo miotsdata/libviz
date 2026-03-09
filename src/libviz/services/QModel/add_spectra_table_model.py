@@ -2,6 +2,7 @@
 
 import time
 import uuid
+import numpy as np
 
 from PySide6.QtCore import Slot, Signal, Property # pylint: disable=no-name-in-module
 from PySide6.QtSql import QSqlQueryModel, QSqlQuery, QSqlDatabase # pylint: disable=no-name-in-module
@@ -129,17 +130,16 @@ class AddSpectraTableModel(QSqlQueryModel):
     def getSpectraInfoById(self, peak_id: int):
         query = QSqlQuery(self._db)
 
-        sql = f"""
-            SELECT precursor_mz,
-                   retention_time,
-                   polarity,
-                   collision_energy
+        query.prepare("""
+            SELECT precursor_mz, retention_time, polarity, collision_energy,
+                mz_array, intensity_array
             FROM spectrum
-            WHERE id = {peak_id}
+            WHERE id = ?
             LIMIT 1
-        """
+        """)
+        query.addBindValue(peak_id)
 
-        if not query.exec(sql):
+        if not query.exec():
             print("Query failed:", query.lastError().text())
             return None
 
@@ -151,10 +151,17 @@ class AddSpectraTableModel(QSqlQueryModel):
         retention_time = query.value(1)
         polarity = query.value(2)
         collision_energy = query.value(3)
+        mz_blob = bytes(query.value(4))
+        intensity_blob = bytes(query.value(5))
+
+        mz_array = np.frombuffer(mz_blob, dtype=np.float32)
+        intensity_array = np.frombuffer(intensity_blob, dtype=np.float32)
 
         return {
             "precursor_mz": precursor_mz,
             "retention_time": retention_time,
             "polarity": polarity,
-            "collision_energy": collision_energy
+            "collision_energy": collision_energy,
+            "mz": mz_array,
+            "intensity": intensity_array
         }

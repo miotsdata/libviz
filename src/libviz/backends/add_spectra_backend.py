@@ -23,14 +23,15 @@ class AddSpectraBackend(QObject):
             print("calculate_mz error:", e)
             return float("nan")   # NEVER raise
         
-    @Slot(str, str, str, "QVariantMap")
-    def addSpectraToLibrary(self, compound_name: str, compound_formula: str, inchikey: str, spectra_info: dict):
+    @Slot(str, str, str, "QVariantMap", float)
+    def addSpectraToLibrary(self, compound_name: str, compound_formula: str, inchikey: str, spectra_info: dict, adduct_id: float):
         try:
             self.library_service.add_spectra_to_library(
                 compound_name,
                 compound_formula,
                 inchikey,
-                spectra_info
+                spectra_info,
+                adduct_id
             )
             print("Spectra added to library successfully.")
         except Exception as e:
