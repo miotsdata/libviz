@@ -19,6 +19,7 @@ ApplicationWindow {
         padding: 10
 
         property int adduct_id: -1
+        property string adduct_formula: ""
         
         ColumnLayout {
             id: allCol
@@ -32,13 +33,11 @@ ApplicationWindow {
                 // 🔹 Central safe updater function
                 function safeUpdateMZ() {
                     var formula = molecularFormulaText.text
-                    //var adduct_id = addSpectraPane.adduct_id
-                    var adduct_id = 1
+                    var adduct_id = addSpectraPane.adduct_id
 
                     // disable search if formula or adduct not selected
                     if (!formula || adduct_id === -1) {
                         mzText.text = ""
-                        //filterByMzButton.enabled = false
                         return
                     }
 
@@ -55,7 +54,6 @@ ApplicationWindow {
                     } catch (e) {
                         console.log("Error calculating m/z:", e)
                         mzText.text = ""
-                        //filterByMzButton.enabled = false
                     }
                 }
 
@@ -123,8 +121,6 @@ ApplicationWindow {
 
                             //filterByMzButton.enabled = false
                             AddSpectraTableModel.refresh(parseFloat(mzText.text), ppmToleranceSpinBox.value)
-                            //AddSpectraTableModel.refresh(parseFloat(mzText.text), 10)
-                            //clickDebounce.start()
                         }
                     }
                 }
@@ -138,7 +134,112 @@ ApplicationWindow {
 
                     Keys.onEscapePressed: focus = false
 
-                    //onEditingFinished: filterByMzColLayout.safeUpdateMZ()
+                    onEditingFinished: filterByMzColLayout.safeUpdateMZ()
+                }
+
+                RowLayout {
+                    spacing: 10
+
+                    Label {
+                        text: "Adduct:"
+                        font.bold: true
+                    }
+
+                    Label {
+                        id: selectedAdductLabel
+                        text: addSpectraPane.adduct_formula || "None selected"
+                        Layout.minimumWidth: 100
+                    }
+
+                    Button {
+                        text: "Select…"
+                        onClicked: adductDialog.open()
+                    }
+                }
+
+                Dialog {
+                    id: adductDialog
+                    modal: true
+                    title: "Select Adduct"
+                    standardButtons: Dialog.Ok | Dialog.Cancel
+
+                    width: 400
+                    height: 500
+
+                    parent: addSpectraWindow.contentItem
+
+                    x: (parent.width - width) / 2
+                    y: (parent.height - height) / 2
+
+                    property int tempSelectedId: -1
+                    property string tempSelectedFormula: ""
+
+                    Column {
+                        spacing: 12
+                        padding: 10
+
+                        ButtonGroup {
+                            id: adductGroup
+                        }
+
+                        // --------------------
+                        // POSITIVE SECTION
+                        // --------------------
+                        Label {
+                            text: "Positive Mode"
+                            font.bold: true
+                        }
+
+                        Repeater {
+                            model: AdductListModel
+
+                            delegate: RadioButton {
+                                visible: model.charge > 0
+                                text: model.formula
+                                ButtonGroup.group: adductGroup
+
+                                checked: model.id === addSpectraPane.adduct_id
+
+                                onClicked: {
+                                    adductDialog.tempSelectedId = model.id
+                                    adductDialog.tempSelectedFormula = model.formula
+                                }
+                            }
+                        }
+
+                        // --------------------
+                        // NEGATIVE SECTION
+                        // --------------------
+                        Label {
+                            text: "Negative Mode"
+                            font.bold: true
+                        }
+
+                        Repeater {
+                            model: AdductListModel
+
+                            delegate: RadioButton {
+                                visible: model.charge < 0
+                                text: model.formula
+                                ButtonGroup.group: adductGroup
+
+                                checked: model.id === addSpectraPane.adduct_id
+
+                                onClicked: {
+                                    adductDialog.tempSelectedId = model.id
+                                    adductDialog.tempSelectedFormula = model.formula
+                                }
+                            }
+                        }
+                    }
+
+                    onAccepted: {
+                        if (tempSelectedId !== -1) {
+                            addSpectraPane.adduct_id = tempSelectedId
+                            addSpectraPane.adduct_formula = tempSelectedFormula
+                            filterByMzColLayout.safeUpdateMZ()
+                        }
+                    }
                 }
             }
 
