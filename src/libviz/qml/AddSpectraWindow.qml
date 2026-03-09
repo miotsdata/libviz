@@ -20,6 +20,7 @@ ApplicationWindow {
 
         property int adduct_id: -1
         property string adduct_formula: ""
+        property bool can_search: false
         
         ColumnLayout {
             id: allCol
@@ -38,6 +39,7 @@ ApplicationWindow {
                     // disable search if formula or adduct not selected
                     if (!formula || adduct_id === -1) {
                         mzText.text = ""
+                        addSpectraPane.can_search = false
                         return
                     }
 
@@ -46,10 +48,10 @@ ApplicationWindow {
 
                         if (mz === undefined || mz === null || isNaN(mz)) {
                             mzText.text = ""
-                            filterByMzButton.enabled = false
+                            addSpectraPane.can_search = false
                         } else {
                             mzText.text = mz.toFixed(4)
-                            filterByMzButton.enabled = true
+                            addSpectraPane.can_search = true
                         }
                     } catch (e) {
                         console.log("Error calculating m/z:", e)
@@ -101,18 +103,10 @@ ApplicationWindow {
                             }
                     }
 
-                    // Search button
-                    Timer {
-                        id: clickDebounce
-                        interval: 400  // milliseconds
-                        repeat: false
-                        onTriggered: filterByMzButton.enabled = true
-                    }
-
                     Button {
                         id: filterByMzButton
                         text: qsTr("Search")
-                        enabled: !AddSpectraTableModel.querying && mzText.acceptableInput
+                        enabled: !AddSpectraTableModel.querying && (mzText.acceptableInput || addSpectraPane.can_search)
                         onClicked: {
                             addSpectraTable.selectedRow = -1 // reset selection
                             SpectrumPlotModelAddSpectra.clear()
@@ -163,7 +157,7 @@ ApplicationWindow {
                     title: "Select Adduct"
                     standardButtons: Dialog.Ok | Dialog.Cancel
 
-                    width: 400
+                    width: 450
                     height: 500
 
                     parent: addSpectraWindow.contentItem
@@ -174,60 +168,91 @@ ApplicationWindow {
                     property int tempSelectedId: -1
                     property string tempSelectedFormula: ""
 
-                    Column {
-                        spacing: 12
-                        padding: 10
+                    ButtonGroup {
+                        id: adductGroup
+                    }
 
-                        ButtonGroup {
-                            id: adductGroup
-                        }
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 20
 
                         // --------------------
-                        // POSITIVE SECTION
+                        // POSITIVE COLUMN
                         // --------------------
-                        Label {
-                            text: "Positive Mode"
-                            font.bold: true
-                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
 
-                        Repeater {
-                            model: AdductListModel
+                            Label {
+                                text: "Positive Mode"
+                                font.bold: true
+                            }
 
-                            delegate: RadioButton {
-                                visible: model.charge > 0
-                                text: model.formula
-                                ButtonGroup.group: adductGroup
+                            ScrollView {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
 
-                                checked: model.id === addSpectraPane.adduct_id
+                                Column {
+                                    width: parent.width
+                                    spacing: 6
 
-                                onClicked: {
-                                    adductDialog.tempSelectedId = model.id
-                                    adductDialog.tempSelectedFormula = model.formula
+                                    Repeater {
+                                        model: AdductListModel
+
+                                        delegate: RadioButton {
+                                            visible: model.charge > 0
+                                            text: model.formula
+                                            ButtonGroup.group: adductGroup
+
+                                            checked: model.id === addSpectraPane.adduct_id
+
+                                            onClicked: {
+                                                adductDialog.tempSelectedId = model.id
+                                                adductDialog.tempSelectedFormula = model.formula
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
 
                         // --------------------
-                        // NEGATIVE SECTION
+                        // NEGATIVE COLUMN
                         // --------------------
-                        Label {
-                            text: "Negative Mode"
-                            font.bold: true
-                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
 
-                        Repeater {
-                            model: AdductListModel
+                            Label {
+                                text: "Negative Mode"
+                                font.bold: true
+                            }
 
-                            delegate: RadioButton {
-                                visible: model.charge < 0
-                                text: model.formula
-                                ButtonGroup.group: adductGroup
+                            ScrollView {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
 
-                                checked: model.id === addSpectraPane.adduct_id
+                                Column {
+                                    width: parent.width
+                                    spacing: 6
 
-                                onClicked: {
-                                    adductDialog.tempSelectedId = model.id
-                                    adductDialog.tempSelectedFormula = model.formula
+                                    Repeater {
+                                        model: AdductListModel
+
+                                        delegate: RadioButton {
+                                            visible: model.charge < 0
+                                            text: model.formula
+                                            ButtonGroup.group: adductGroup
+
+                                            checked: model.id === addSpectraPane.adduct_id
+
+                                            onClicked: {
+                                                adductDialog.tempSelectedId = model.id
+                                                adductDialog.tempSelectedFormula = model.formula
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
