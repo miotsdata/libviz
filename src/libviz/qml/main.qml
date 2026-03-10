@@ -2,9 +2,8 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import Metabolomics.Models 1.0
-
-import "qrc:/qml"
 
 ApplicationWindow {
     id: window
@@ -13,6 +12,9 @@ ApplicationWindow {
     height: 600
     minimumWidth: 800
     title: "LibViz"
+
+    property bool saveMenuVisible: false
+    property bool insertMenuVisible: false
 
     // =========================
     // MENU BAR
@@ -43,6 +45,7 @@ ApplicationWindow {
 
             MenuItem {
                 text: "Spectra from mzml"
+                enabled: window.insertMenuVisible
                 onTriggered: {
                     var path = LoadMzmlBackend.selectPathMzml();
                     if (path !== "") {
@@ -50,6 +53,37 @@ ApplicationWindow {
                     }
                 }
             }
+        }
+
+        Menu {
+            title: "Save"
+
+            MenuItem {
+                enabled: window.saveMenuVisible
+                text: "As .db file"
+                onTriggered: {
+                    savefileDialog.open()
+                }
+            }
+        }
+    }
+
+    FileDialog {
+        id: savefileDialog
+        fileMode: FileDialog.SaveFile
+        currentFile: "library.db"
+        nameFilters: ["DB files (*.db)"]
+
+        onAccepted: {
+            var path = selectedFile.toString()
+
+            // Ensure it ends with .db
+            if (!path.endsWith(".db")) {
+                path += ".db"
+            }
+
+            libraryService.save_as_db(path)
+            console.log("Saving to:", path)
         }
     }
 
@@ -132,6 +166,8 @@ ApplicationWindow {
             statusBar.visible = false;
             statusText.text = "";
             console.log("SUCCESS SIGNAL RECEIVED");
+            window.saveMenuVisible = true;
+            window.insertMenuVisible = true;
             nav.show_library_page();
         }
 

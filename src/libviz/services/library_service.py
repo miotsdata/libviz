@@ -4,6 +4,7 @@ from PySide6.QtCore import Property, QObject, Signal, Slot # pylint: disable=no-
 
 class LibraryService(QObject):
     libraryChanged = Signal(str, int, int)
+    librarySaved = Signal()
 
     def __init__(self):
         super().__init__()
@@ -74,3 +75,10 @@ class LibraryService(QObject):
             raise ValueError("No library loaded")
         self._library.add_spectra(compound_name, compound_formula, inchikey, spectra_info, adduct_id)
         self.libraryChanged.emit(self._library.name, self._library.n_compounds, self._library.n_spectra)
+
+    @Slot(str)
+    def save_as_db(self, path: str):
+        if "file://" in path:
+            path = path.replace("file://", "")
+        self._library.save_as_db(path)
+        self.librarySaved.emit()

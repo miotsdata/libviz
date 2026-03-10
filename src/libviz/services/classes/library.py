@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker, Session
 import numpy as np
 import logging
 import tempfile
+import shutil
 
 from libviz.services.db.extensions import Base
 from libviz.services.db.models import Compound, Spectrum, LibraryMetadata, SpectrumMetadata, AdductType
@@ -18,6 +19,7 @@ VERSION = "1"
 class Library:
     def __init__(self, name: str, path: Path):
         self.path = path
+        self.is_temp = True
         self.name = name
         self.engine = create_engine(f"sqlite:///{self.path}", future=True)
         self.Session = sessionmaker(bind=self.engine, future=True)
@@ -42,7 +44,6 @@ class Library:
             session.commit()
 
             populate_adduct_types(session)
-            
 
 
     @classmethod
@@ -65,6 +66,7 @@ class Library:
         session = lib.Session()
         lib.n_compounds = session.query(Compound).count()
         lib.n_spectra = session.query(Spectrum).count()
+        lib.is_temp = False
         return lib
 
     @classmethod
@@ -120,6 +122,7 @@ class Library:
         lib.Session = Session_db
         lib.n_compounds = session.query(Compound).count()
         lib.n_spectra = session.query(Spectrum).count()
+        lib.is_temp = True
 
         session.close()
 
@@ -295,3 +298,11 @@ class Library:
 
             session.add(spectrum)
             session.commit()  # commit to get spectrum.id
+
+
+    def save_as_db(self, path: str):
+        try:
+            shutil.copy(self.path, path)
+        except shutil.SameFileError:
+            pass
+        self.path = path
