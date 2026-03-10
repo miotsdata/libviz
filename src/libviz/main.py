@@ -13,6 +13,8 @@ from libviz.utils import configure_logging
 from libviz.backends import CreateLibraryBackend, LoadLibraryBackend, LoadMzmlBackend, AddSpectraBackend
 from libviz.services import LibraryService
 
+import libviz.resources_rc
+
 def main():
     configure_logging()
     app = QApplication(sys.argv)
@@ -71,11 +73,7 @@ def main():
 
     engine.rootContext().setContextProperty("libraryService", library_service)
 
-    qml_dir = Path(__file__).parent / "qml"
-    main_qml = qml_dir / "main.qml"
-    #main_qml = qml_dir / "AddSpectraWindow.qml"
-
-    engine.load(QUrl.fromLocalFile(main_qml.resolve().as_posix()))
+    engine.load(QUrl("qrc:/qml/main.qml"))
 
     if not engine.rootObjects():
         sys.exit(1)

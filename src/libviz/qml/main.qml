@@ -4,6 +4,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Metabolomics.Models 1.0
 
+import "qrc:/qml"
+
 ApplicationWindow {
     id: window
     visible: true
@@ -151,7 +153,7 @@ ApplicationWindow {
         function onSuccessOccurred(path) {
             statusBar.visible = false;
             statusText.text = "";
-            var component = Qt.createComponent("AddSpectraWindow.qml")
+            var component = Qt.createComponent("qrc:/qml/AddSpectraWindow.qml")
             var window    = component.createObject()
             window.show()
         }

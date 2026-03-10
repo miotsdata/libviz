@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Metabolomics.Models 1.0
-import "utils"
+import "qrc:/qml/utils"
 
 ApplicationWindow {
     id: addSpectraWindow
