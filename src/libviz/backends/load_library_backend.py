@@ -112,8 +112,12 @@ class LoadFromMspWorker(QObject):
         except FileNotFoundError:
             self.errorOccurred.emit("This file does not exist")
             return
-        except Exception:
-            self.errorOccurred.emit("Failed to load library")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()  # prints full traceback
+
+            logger.exception("MSP loading failed")
+            self.errorOccurred.emit(str(e))  # send real message
             return
 
         self.finished.emit()

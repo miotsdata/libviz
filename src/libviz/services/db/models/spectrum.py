@@ -22,7 +22,7 @@ class Spectrum(Base):
         server_default=text("CURRENT_TIMESTAMP"),
         nullable=False
     )
-    spectrum_hash = Column(String(64), nullable=False)
+    spectrum_hash = Column(String(64), nullable=False, index=True)
 
     compound = relationship("Compound", back_populates="spectra")
     adduct_type = relationship("AdductType", back_populates="spectra")
@@ -34,6 +34,7 @@ class Spectrum(Base):
 
     __table_args__ = (
         UniqueConstraint(
+            "compound_id",
             "adduct_type_id",
             "polarity",
             "collision_energy",

@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker, Session
 import numpy as np
 import logging
 import tempfile
-import shutil
+import sqlite3
 
 from libviz.services.db.extensions import Base
 from libviz.services.db.models import Compound, Spectrum, LibraryMetadata, SpectrumMetadata, AdductType
@@ -188,19 +188,6 @@ class Library:
             )
             session.add(adduct_type)
             session.flush()
-        
-
-        # ---------- check if spectrum already exists ----------
-        existing = session.query(Spectrum).filter_by(
-            adduct_type_id=adduct_type.id,
-            polarity=entry.get("IONMODE"),
-            collision_energy = float(entry.get("COLLISIONENERGY") or 0.0),
-            spectrum_hash=spectrum_hash
-        ).one_or_none()
-
-        if existing:
-            # spectrum already in DB → skip everything
-            return existing
 
         # ---------- compound ----------
         inchikey = entry.get("INCHIKEY")
@@ -218,6 +205,20 @@ class Library:
             )
             session.add(compound)
             session.flush()  # get compound.id
+
+        
+        # ---------- check if spectrum already exists ----------
+        existing = session.query(Spectrum).filter_by(
+            compound_id=compound.id,
+            adduct_type_id=adduct_type.id,
+            polarity=entry.get("IONMODE"),
+            collision_energy = float(entry.get("COLLISIONENERGY") or 0.0),
+            spectrum_hash=spectrum_hash
+        ).one_or_none()
+
+        if existing:
+            # spectrum already in DB → skip everything
+            return existing
 
         # ---------- peaks / spectrum ----------
         spectrum = Spectrum.from_arrays(
@@ -301,8 +302,22 @@ class Library:
 
 
     def save_as_db(self, path: str):
+
+        # ensure WAL is flushed
+        with self.engine.connect() as conn:
+            conn.exec_driver_sql("PRAGMA wal_checkpoint(FULL);")
+
+        # close all pooled connections
+        self.engine.dispose()
+
+        src = sqlite3.connect(self.path)
+        dest = sqlite3.connect(path)
+
         try:
-            shutil.copy(self.path, path)
-        except shutil.SameFileError:
-            pass
-        self.path = path
+            src.backup(dest)
+        finally:
+            dest.close()
+            src.close()
+
+        self.path = Path(path)
+        self.is_temp = False
