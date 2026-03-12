@@ -323,8 +323,8 @@ class Library:
         self.is_temp = False
 
 
-    def find_identical_spectra(self, precursor_mz: float, polarity: str, ppm_tolerance: float,
-                               hash_ref: str):
+    def find_identical_spectra(self, precursor_mz: float, polarity: str, hash_ref: str,
+                               ppm_tolerance: float = 5):
         matches = []
         with self.session_scope() as session:
             candidates = session.query(Spectrum).filter_by(
@@ -343,13 +343,9 @@ class Library:
             return matches
 
 
-    def get_compound_from_spectrum_id(self, spectrum_id: int):
+    def get_compound_id_from_spectrum_id(self, spectrum_id: int):
         with self.session_scope() as session:
             spectrum = session.query(Spectrum).filter_by(id=spectrum_id).one_or_none()
             if spectrum is None:
                 raise ValueError(f"Spectrum with ID {spectrum_id} not found")
-            compound = session.query(Compound).filter_by(id=spectrum.compound_id).one_or_none()
-            if compound is None:
-                raise ValueError(f"Compound with ID {spectrum.compound_id} not found")
-            return compound
-
+            return spectrum.compound_id

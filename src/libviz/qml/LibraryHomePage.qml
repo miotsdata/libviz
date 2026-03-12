@@ -4,7 +4,7 @@ import QtQuick.Layouts
 import Metabolomics.Models 1.0
 
 Page {
-    id: testessdhfgaslhbmas
+    id: libraryHomePage
     anchors.fill: parent
 
     ColumnLayout{
@@ -107,8 +107,8 @@ Page {
                     columnSpacing: 1
                     rowSpacing: 1
 
-                    property int selectedRow
-                    property int hoveredRow
+                    property int selectedRow: -1
+                    property int hoveredRow: -1
 
 
                     selectionModel: ItemSelectionModel {
@@ -156,7 +156,9 @@ Page {
                         MouseArea {
                             anchors.fill: parent
                             onClicked: {
+
                                 table.selectedRow = row
+                                spectraTable.selectedRow = -1
                                 // model.id refers to the 'id' column of the compound
                                 // var compound_id = CompoundTableModel.idForRow(table.currentRow)
                                 // console.log("Clicked compound_id:", compound_id)
@@ -164,6 +166,7 @@ Page {
                                 var compound_id = CompoundTableModel.idForRow(row)
                                 console.log("Clicked compound_id:", compound_id)
                                 SpectraTableModel.setFilter(compound_id)
+                                SpectrumPlotModelLibraryHome.clear()
                             }
                         }
 
@@ -281,8 +284,8 @@ Page {
                     columnSpacing: 1
                     rowSpacing: 1
 
-                    property int selectedRow
-                    property int hoveredRow
+                    property int selectedRow: -1
+                    property int hoveredRow: -1
 
                     columnWidthProvider: function(column) {
                         if (column === 0) return 0
@@ -329,6 +332,7 @@ Page {
                                 var spectra_id = SpectraTableModel.idForRow(row)
                                 console.log("Clicked spectra_id:", spectra_id)
                                 SpectrumPlotModelLibraryHome.setPeakId(spectra_id)
+                                
                             }
                         }
 
@@ -476,4 +480,10 @@ Page {
             }
         }
     }
+
+
+
+
+
+
 }
