@@ -89,3 +89,10 @@ class LibraryService(QObject):
             path = path.replace("file://", "")
         self._library.save_as_db(path)
         self.librarySaved.emit()
+
+
+    @Slot(int)
+    def get_identical_spectra_compounds(self, spectrum_id: int):
+        if not self._library:
+            raise ValueError("No library loaded")
+        return self._library.get_identical_spectra_compounds(spectrum_id)

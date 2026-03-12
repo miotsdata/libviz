@@ -349,3 +349,32 @@ class Library:
             if spectrum is None:
                 raise ValueError(f"Spectrum with ID {spectrum_id} not found")
             return spectrum.compound_id
+
+
+    def get_identical_spectra_compounds(self, spectrum_id: int):
+        with self.session_scope() as session:
+            spectrum = session.query(Spectrum).filter_by(id=spectrum_id).one_or_none()
+            if spectrum is None:
+                raise ValueError(f"Spectrum with ID {spectrum_id} not found")
+
+            identical_spectra_ids = self.find_identical_spectra(
+                precursor_mz=spectrum.precursor_mz,
+                polarity=spectrum.polarity,
+                hash_ref=spectrum.spectrum_hash
+            )
+
+            identical_spectra_ids = [sid for sid in identical_spectra_ids if sid != spectrum_id]
+
+            print(f"Found {len(identical_spectra_ids)} identical spectra for spectrum ID {spectrum_id}")
+
+            compounds = []
+            for spec_id in identical_spectra_ids:
+                spec = session.query(Spectrum).filter_by(id=spec_id).one()
+                comp = session.query(Compound).filter_by(id=spec.compound_id).one()
+                compounds.append({
+                    "id": comp.id,
+                    "name": comp.name,
+                    "formula": comp.formula
+                })
+
+            return compounds

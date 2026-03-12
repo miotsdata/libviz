@@ -51,7 +51,8 @@ class SpectraTableModel(QSqlQueryModel):
                    at.formula as adduct_type,
                    s.polarity,
                    s.collision_energy,
-                   s.added_on
+                   s.added_on,
+                   '' as find_button
             FROM spectrum s
             JOIN adduct_type at ON s.adduct_type_id = at.id
             WHERE s.compound_id = ?
@@ -91,14 +92,14 @@ class SpectraTableModel(QSqlQueryModel):
     def setSort(self, column_index, order):
         column_map = {
             0: "s.id",
-            1: "precursor_mz",
-            2: "adduct_type",
-            3: "polarity",
-            4: "collision_energy",
-            5: "added_on"
+            1: "s.precursor_mz",
+            2: "at.formula",
+            3: "s.polarity",
+            4: "s.collision_energy",
+            5: "s.added_on"
         }
 
-        self._current_sort_column = "s." + column_map.get(column_index, "s.id")
+        self._current_sort_column = column_map.get(column_index, "s.id")
         self._current_sort_order = "ASC" if order.lower() == "asc" else "DESC"
         self.refresh()
 

@@ -219,6 +219,7 @@ Page {
                     ListElement { label: "Polarity"; column: 3 }
                     ListElement { label: "Collision Energy"; column: 4 }
                     ListElement { label: "Added On"; column: 5 }
+                    ListElement { label: "Find identical spectra"; column: 6}
                 }
 
                 Row {
@@ -288,12 +289,13 @@ Page {
                     property int hoveredRow: -1
 
                     columnWidthProvider: function(column) {
-                        if (column === 0) return 0
+                        if (column === 0) return 1
                         if (column === 1) return 120
                         if (column === 2) return 150
                         if (column === 3) return 80
                         if (column === 4) return 120
                         if (column === 5) return 180
+                        if (column === 6) return 120
                         return 100
                     }
 
@@ -303,41 +305,33 @@ Page {
                         border.width: 0.5
                         clip: true
 
-                        // Store row index
                         required property bool selected
                         required property bool current
 
-                        // Background for hover
                         Rectangle {
                             anchors.fill: parent
-                            color: spectraTable.selectedRow === row ? '#e0da20' : (spectraTable.hoveredRow === row ? '#a7a7a7' : "#ffffff")
+                            color: spectraTable.selectedRow === row
+                                   ? '#e0da20'
+                                   : (spectraTable.hoveredRow === row ? '#a7a7a7' : "#ffffff")
                         }
 
                         HoverHandler {
-                            id: hoverHandlerSpectra
-
-                            onHoveredChanged: {
-                                spectraTable.hoveredRow = row
-                            }
+                            onHoveredChanged: spectraTable.hoveredRow = row
                         }
 
                         MouseArea {
                             anchors.fill: parent
+                            enabled: column !== 6
+
                             onClicked: {
                                 spectraTable.selectedRow = row
-                                // model.id refers to the 'id' column of the compound
-                                // var compound_id = CompoundTableModel.idForRow(table.currentRow)
-                                // console.log("Clicked compound_id:", compound_id)
-                                console.log("Clicked row:", row, "column:", column)
                                 var spectra_id = SpectraTableModel.idForRow(row)
-                                console.log("Clicked spectra_id:", spectra_id)
                                 SpectrumPlotModelLibraryHome.setPeakId(spectra_id)
-                                
                             }
                         }
 
                         Text {
-                            id: cellTextSpectra
+                            visible: column !== 6
                             anchors.fill: parent
                             anchors.margins: 6
                             text: model.display
@@ -347,6 +341,18 @@ Page {
                             wrapMode: Text.NoWrap
                         }
 
+                        Button {
+                            visible: column === 6
+                            anchors.centerIn: parent
+                            text: "Find"
+
+                            onClicked: {
+                                var spectra_id = SpectraTableModel.idForRow(row)
+                                print("Finding identical spectra for spectra_id:", spectra_id)
+                                IdenticalSpectraCompoundListModel.refresh(spectra_id)
+                                showIdenticalSpectraDialog.open()
+                            }
+                        }
                     }
 
                     ScrollBar.vertical: ScrollBar {}
@@ -482,8 +488,45 @@ Page {
     }
 
 
+    Dialog {
+        id: showIdenticalSpectraDialog
+        title: "Identical Spectra Compounds"
+        modal: true
+        standardButtons: Dialog.Ok
+        width: 400
+        height: 300
 
+        ListView {
+            id: identicalSpectraList
+            anchors.fill: parent
+            model: IdenticalSpectraCompoundListModel
 
+            delegate: Rectangle {
+                width: parent.width
+                height: 40
+                border.width: 0.5
 
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: 6
+                    spacing: 10
+
+                    Text {
+                        text: model.name
+                        font.bold: true
+                    }
+
+                    Text {
+                        text: model.formula
+                        color: "#666"
+                    }
+                }
+
+                Component.onCompleted: {
+                    console.log("Row:", index, model.name, model.formula)
+                }
+            }
+        }
+    }
 
 }

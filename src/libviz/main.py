@@ -8,7 +8,7 @@ from PySide6.QtQuickControls2 import QQuickStyle # pylint: disable=no-name-in-mo
 
 from libviz.app import AppState, Navigation
 #from libviz.services.QModel.mock_model import MockCompoundModel
-from libviz.services.QModel import CompoundTableModel, SpectraTableModel, SpectrumPlotModel, AddSpectraTableModel, AdductListModel
+from libviz.services.QModel import CompoundTableModel, SpectraTableModel, SpectrumPlotModel, AddSpectraTableModel, AdductListModel, IdenticalSpectraCompoundListModel
 from libviz.utils import configure_logging
 from libviz.backends import CreateLibraryBackend, LoadLibraryBackend, LoadMzmlBackend, AddSpectraBackend
 from libviz.services import LibraryService
@@ -40,6 +40,8 @@ def main():
     add_spectra_backend = AddSpectraBackend(library_service)
 
     load_library_backend = LoadLibraryBackend(library_service)
+    identical_spectra_compound_list_model = IdenticalSpectraCompoundListModel(library_service)
+
 
     qmlRegisterSingletonInstance(CompoundTableModel, "Metabolomics.Models", 1, 0, "CompoundTableModel", compound_model)
     qmlRegisterSingletonInstance(SpectraTableModel, "Metabolomics.Models", 1, 0, "SpectraTableModel", spectra_table_model)
@@ -51,6 +53,7 @@ def main():
     qmlRegisterSingletonInstance(AddSpectraBackend, "Metabolomics.Models", 1, 0, "AddSpectraBackend", add_spectra_backend)
     qmlRegisterSingletonInstance(LoadLibraryBackend, "Metabolomics.Models", 1, 0, "LoadLibraryBackend", load_library_backend)
     qmlRegisterSingletonInstance(CreateLibraryBackend, "Metabolomics.Models", 1, 0, "CreateLibraryBackend", create_library_backend)
+    qmlRegisterSingletonInstance(IdenticalSpectraCompoundListModel, "Metabolomics.Models", 1, 0, "IdenticalSpectraCompoundListModel", identical_spectra_compound_list_model)
 
 
     library_service.libraryChanged.connect(compound_model.refresh)
