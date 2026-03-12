@@ -62,7 +62,7 @@ class Library:
             name = meta.name
 
         # Create instance
-        lib = cls(name=name, path=path)
+        lib = cls(name=name, path=Path(path))
         session = lib.Session()
         lib.n_compounds = session.query(Compound).count()
         lib.n_spectra = session.query(Spectrum).count()
@@ -321,3 +321,35 @@ class Library:
 
         self.path = Path(path)
         self.is_temp = False
+
+
+    def find_identical_spectra(self, precursor_mz: float, polarity: str, ppm_tolerance: float,
+                               hash_ref: str):
+        matches = []
+        with self.session_scope() as session:
+            candidates = session.query(Spectrum).filter_by(
+                polarity=polarity,
+                spectrum_hash=hash_ref
+            ).all()
+
+            if not candidates:
+                return matches
+
+            for spectrum in candidates:
+                ppm_diff = abs(spectrum.precursor_mz - precursor_mz) / precursor_mz * 1e6
+                if ppm_diff <= ppm_tolerance:
+                    matches.append(spectrum.id)
+
+            return matches
+
+
+    def get_compound_from_spectrum_id(self, spectrum_id: int):
+        with self.session_scope() as session:
+            spectrum = session.query(Spectrum).filter_by(id=spectrum_id).one_or_none()
+            if spectrum is None:
+                raise ValueError(f"Spectrum with ID {spectrum_id} not found")
+            compound = session.query(Compound).filter_by(id=spectrum.compound_id).one_or_none()
+            if compound is None:
+                raise ValueError(f"Compound with ID {spectrum.compound_id} not found")
+            return compound
+

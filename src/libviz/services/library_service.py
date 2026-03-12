@@ -29,12 +29,19 @@ class LibraryService(QObject):
                 self._library.name, self._library.n_compounds, self._library.n_spectra
             )
 
-    @Slot()
-    def load(self, path: str):
+    @Slot(str)
+    def load_from_db(self, path: str):
+        if "file://" in path:
+            path = path.replace("file://", "")
         self._library = Library.load_from_db(path=Path(path))
+        self.libraryChanged.emit(
+                self._library.name, self._library.n_compounds, self._library.n_spectra
+            )
 
     @Slot()
     def loadFromMSP(self, path: str):
+        if "file://" in path:
+            path = path.replace("file://", "")
         self._library = Library.loadFromMSP(path)
         self.libraryChanged.emit(
                 self._library.name, self._library.n_compounds, self._library.n_spectra

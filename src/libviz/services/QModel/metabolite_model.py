@@ -30,7 +30,7 @@ class CompoundTableModel(QSqlQueryModel):
             self._db = QSqlDatabase.database(self.library_service.connection_name)
         else:
             self._db = QSqlDatabase.addDatabase("QSQLITE", self.library_service.connection_name)
-            self._db.setDatabaseName(self.library_service.db_path)
+            self._db.setDatabaseName(str(self.library_service.db_path))
 
         if not self._db.open():
             print("Database open failed:", self._db.lastError().text())

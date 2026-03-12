@@ -38,6 +38,13 @@ ApplicationWindow {
                     }
                 }
             }
+
+            MenuItem {
+                text: "Load library from .db"
+                onTriggered: {
+                    readdbfileDialog.open()
+                }
+            }
         }
 
         Menu {
@@ -71,7 +78,6 @@ ApplicationWindow {
     FileDialog {
         id: savefileDialog
         fileMode: FileDialog.SaveFile
-        currentFile: "library.db"
         nameFilters: ["DB files (*.db)"]
 
         onAccepted: {
@@ -84,6 +90,18 @@ ApplicationWindow {
 
             libraryService.save_as_db(path)
             console.log("Saving to:", path)
+        }
+    }
+
+    FileDialog {
+        id: readdbfileDialog
+        nameFilters: ["DB files (*.db)"]
+
+        onAccepted: {
+            var path = selectedFile.toString()
+
+            LoadLibraryBackend.loadLibraryFromdb(path)
+            console.log("Loading from:", path)
         }
     }
 

@@ -18,25 +18,6 @@ class LoadLibraryBackend(QObject):
         self._thread = None
         self._worker = None
 
-
-    @Slot(str)
-    def loadLibraryFromDb(self, path: str):
-        logger.info("Loading library: %s", path)
-
-        try:
-            self._library_service.load(path)
-        except FileNotFoundError:
-            logger.warning("File not found: %s", path)
-            self.errorOccurred.emit("This file does not exists")
-            return
-        except Exception as e:
-            logger.exception("Failed to load library: %s", e)
-            self.errorOccurred.emit("Failed to load library")
-            return
-
-        logger.info("Library successfully loaded")
-        self.loadedLibrarySuccessfully.emit(self._library_service.connection_name, self._library_service.db_path)
-
     @Slot(str)
     def loadLibraryFromMsp(self, path: str):
         logger.info("Loading library: %s", path)
@@ -75,17 +56,6 @@ class LoadLibraryBackend(QObject):
         logger.error("Library loading failed: %s", message)
         self.errorOccurred.emit(message)
 
-
-    @Slot(result=str)
-    def selectPathDB(self):
-        path, _ = QFileDialog.getOpenFileName(
-            None,
-            "Load library file",
-            "",
-            "Database Files (*.db)"
-        )
-        return path or ""
-
     @Slot(result=str)
     def selectPathMsp(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -95,6 +65,26 @@ class LoadLibraryBackend(QObject):
             "MSP Files (*.msp)"
         )
         return path or ""
+
+
+    @Slot(str)
+    def loadLibraryFromdb(self, path: str):
+        self.libraryLoading.emit(path)
+        logger.info("Loading library: %s", path)
+
+        try:
+            self._library_service.load_from_db(path)
+        except FileNotFoundError:
+            logger.warning("File not found: %s", path)
+            self.errorOccurred.emit("This file does not exists")
+            return
+        except Exception as e:
+            logger.exception("Failed to load library: %s", e)
+            self.errorOccurred.emit("Failed to load library")
+            return
+
+        logger.info("Library successfully loaded")
+        self.loadedLibrarySuccessfully.emit(self._library_service.connection_name, self._library_service.db_path)
 
 class LoadFromMspWorker(QObject):
     finished = Signal()
