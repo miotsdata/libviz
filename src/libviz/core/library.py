@@ -7,6 +7,7 @@ import tempfile
 import sqlite3
 
 from libviz.core.db.extensions import Base
+from libviz.core.db.migrations import upgrade_library_schema
 from libviz.core.db.models import (
     Compound,
     Spectrum,
@@ -32,16 +33,16 @@ class Library:
 
     @classmethod
     def create(cls, path: str | Path, name: str):
-        if path.exists():
-            raise FileExistsError(f"Library already exists at path {str(path)}")
-
         if not isinstance(path, (str, Path)):
             raise TypeError(f"Path should be either str or Path, found {type(path).__name__}")
+        
+        if path.exists():
+            raise FileExistsError(f"Library already exists at path {str(path)}")
 
         path = Path(path) if isinstance(path, str) else path
         lib = cls(name = name, path=path)
 
-        Base.metadata.create_all(lib.engine)
+        upgrade_library_schema(lib.path)
 
         with lib.session_scope() as session:
             meta = LibraryMetadata(
@@ -61,7 +62,7 @@ class Library:
                 self.session = None
 
             def __enter__(self):
-                self.session = self.lib.Session()
+                self.session = self.lib.session_maker()
                 return self.session
 
             def __exit__(self, exc_type, exc, tb):
