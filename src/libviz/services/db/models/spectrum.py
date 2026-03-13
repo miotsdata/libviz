@@ -1,8 +1,9 @@
 import hashlib
 import numpy as np
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, LargeBinary, UniqueConstraint, text
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, LargeBinary, UniqueConstraint
 from sqlalchemy.orm import relationship
+from datetime import datetime
 
 from libviz.services.db.extensions import Base
 
@@ -19,7 +20,7 @@ class Spectrum(Base):
     intensity_array = Column(LargeBinary, nullable=False)
     added_on = Column(
         DateTime(timezone=True),
-        server_default=text("CURRENT_TIMESTAMP"),
+        default=datetime.now,
         nullable=False
     )
     spectrum_hash = Column(String(64), nullable=False, index=True)

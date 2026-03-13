@@ -1,12 +1,23 @@
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from libviz.chore.extensions import Base
+from libviz.services.db.extensions import Base
+
 
 @pytest.fixture(scope="module")
 def engine():
     db_engine = create_engine("sqlite:///:memory:", future=True)
+
+    # Enable SQLite foreign key enforcement
+    @event.listens_for(db_engine, "connect")
+    def enable_sqlite_fk(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=MEMORY")
+        cursor.execute("PRAGMA synchronous=OFF")
+        cursor.close()
+
     Base.metadata.create_all(db_engine)
     return db_engine
 

@@ -69,6 +69,7 @@ class Library:
         lib.is_temp = False
         return lib
 
+
     @classmethod
     def loadFromMSP(cls, msp_path: str):
         """
@@ -85,7 +86,7 @@ class Library:
         tmp_file.close()
 
         db_path = tmp_file.name
-        print(db_path)
+        logger.debug(f"Temporary database path: {db_path}")
 
         engine = create_engine(
             f"sqlite:///{db_path}",
@@ -125,11 +126,9 @@ class Library:
         lib.is_temp = True
 
         session.close()
-
         return lib
 
     # ---------- session handling ----------
-
     def session_scope(self):
         class _SessionContext:
             def __init__(self, lib):
@@ -151,12 +150,8 @@ class Library:
 
     # ---------- helpers ----------
 
-    def is_valid(self) -> bool:
-        return self.path.exists()
-
     @staticmethod
     def _insert_msp_entry(session: Session, entry):
-        
         # ---------- prepare mz/intensity ----------
         mz = np.array([float(m) for m, _ in entry.get("peaks", [])], dtype=np.float32)
         intensity = np.array([float(i) for _, i in entry.get("peaks", [])], dtype=np.float32)
@@ -259,12 +254,14 @@ class Library:
             return [{"id": a.id, "formula": a.formula, "charge": a.charge, 
                      "delta_mass": a.delta_mass} for a in adducts]
 
+
     def get_adduct_delta(self, adduct_id: int):
         with self.session_scope() as session:
             adduct = session.query(AdductType).filter_by(id=adduct_id).one_or_none()
             if adduct is None:
                 raise ValueError(f"Adduct with ID {adduct_id} not found")
             return adduct.delta_mass
+
 
     def add_spectra(self, compound_name: str, compound_formula: str, inchikey: str, spectra_info: dict, adduct_id: float):
         with self.session_scope() as session:
@@ -303,6 +300,9 @@ class Library:
 
     def save_as_db(self, path: str):
 
+        if self.name == "NONAME":
+            raise ValueError("Name cannot be NONAME. Please rename the library with the rename method.")
+
         # ensure WAL is flushed
         with self.engine.connect() as conn:
             conn.exec_driver_sql("PRAGMA wal_checkpoint(FULL);")
@@ -321,6 +321,7 @@ class Library:
 
         self.path = Path(path)
         self.is_temp = False
+        logger.debug("Saved library to %s", path)
 
 
     def find_identical_spectra(self, precursor_mz: float, polarity: str, hash_ref: str,
@@ -365,7 +366,7 @@ class Library:
 
             identical_spectra_ids = [sid for sid in identical_spectra_ids if sid != spectrum_id]
 
-            print(f"Found {len(identical_spectra_ids)} identical spectra for spectrum ID {spectrum_id}")
+            logger.debug("Found %d identical spectra for spectrum ID %d", len(identical_spectra_ids), spectrum_id)
 
             compounds = []
             for spec_id in identical_spectra_ids:
@@ -378,3 +379,14 @@ class Library:
                 })
 
             return compounds
+
+
+    def rename(self, new_name: str):
+        logger.debug("Renaming library from %s to %s", self.name, new_name)
+        with self.session_scope() as session:
+            meta = session.query(LibraryMetadata).first()
+            if meta is None:
+                raise ValueError("No metadata found in library")
+            meta.name = new_name
+            session.commit()
+            self.name = new_name

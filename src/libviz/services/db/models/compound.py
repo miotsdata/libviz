@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, text
+from sqlalchemy import Column, Integer, String, Float, DateTime
 from sqlalchemy.orm import relationship
+from datetime import datetime
 
 from libviz.services.db.extensions import Base
 
@@ -10,11 +11,11 @@ class Compound(Base):
 
     name = Column(String(collation="NOCASE"), index=True)
     formula = Column(String, index=True)
-    inchikey = Column(String, unique=True)
+    inchikey = Column(String, unique=True, nullable=False)
     exact_mass = Column(Float, index=True)
     added_on = Column(
         DateTime(timezone=True),
-        server_default=text("CURRENT_TIMESTAMP"),
+        default=datetime.now,
         nullable=False
     )
 

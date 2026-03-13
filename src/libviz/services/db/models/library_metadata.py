@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, text
+from sqlalchemy import Column, Integer, String, DateTime
+from datetime import datetime
 
 from libviz.services.db.extensions import Base
 
@@ -9,13 +10,14 @@ class LibraryMetadata(Base):
     name = Column(String, nullable=False)
     added_on = Column(
         DateTime(timezone=True),
-        server_default=text("CURRENT_TIMESTAMP"),
+        default=datetime.now,
         nullable=False
     )
     created_version = Column(String(10), nullable=False)
     last_updated_on = Column(
         DateTime(timezone=True),
-        server_default=text("CURRENT_TIMESTAMP"),
+        default=datetime.now,
+        onupdate=datetime.now,
         nullable=False
     )
     actual_version = Column(String(10), nullable=False)
