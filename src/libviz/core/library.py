@@ -42,6 +42,7 @@ class Library:
         path = Path(path) if isinstance(path, str) else path
         lib = cls(name = name, path=path)
 
+        # upgrade schema (creates tables if DB is new, applies migrations if existing)
         upgrade_library_schema(lib.path)
 
         with lib.session_scope() as session:
@@ -53,7 +54,8 @@ class Library:
 
             populate_adduct_types(session)
         return lib
-    
+
+
     # ---------- session handling ----------
     def session_scope(self):
         class _SessionContext:
@@ -74,9 +76,43 @@ class Library:
 
         return _SessionContext(self)
 
+
+     # ---------- Saving ----------
+    def save_as_db(self, path: str | Path):
+        logger.debug("Saving library to %s", path)
+
+        if not isinstance(path, (str, Path)):
+            raise TypeError(f"Path should be either str or Path, found {type(path).__name__}")
+
+        if self.name == "NONAME":
+            raise ValueError("Name cannot be NONAME. Please rename the library with the rename method.")
+
+        # ensure WAL is flushed
+        with self.engine.connect() as conn:
+            conn.exec_driver_sql("PRAGMA wal_checkpoint(FULL);")
+
+        # close all pooled connections
+        self.engine.dispose()
+
+        src = sqlite3.connect(self.path)
+        dest = sqlite3.connect(str(path))
+
+        try:
+            src.backup(dest)
+        finally:
+            dest.close()
+            src.close()
+
+        self.path = Path(path)
+        self.is_temp = False
+        logger.debug("Saved library to %s", path)
+
 """
     @classmethod
-    def load_from_db(cls, path: Path):
+    def load_from_db(cls, path: str | Path):
+        if not isinstance(path, (str, Path)):
+            raise TypeError(f"Path should be either str or Path, found {type(path).__name__}")
+
         if not Path(path).exists():
             raise FileNotFoundError(path)
 
@@ -300,32 +336,6 @@ class Library:
 
             session.add(spectrum)
             session.commit()  # commit to get spectrum.id
-
-
-    def save_as_db(self, path: str):
-
-        if self.name == "NONAME":
-            raise ValueError("Name cannot be NONAME. Please rename the library with the rename method.")
-
-        # ensure WAL is flushed
-        with self.engine.connect() as conn:
-            conn.exec_driver_sql("PRAGMA wal_checkpoint(FULL);")
-
-        # close all pooled connections
-        self.engine.dispose()
-
-        src = sqlite3.connect(self.path)
-        dest = sqlite3.connect(path)
-
-        try:
-            src.backup(dest)
-        finally:
-            dest.close()
-            src.close()
-
-        self.path = Path(path)
-        self.is_temp = False
-        logger.debug("Saved library to %s", path)
 
 
     def find_identical_spectra(self, precursor_mz: float, polarity: str, hash_ref: str,
