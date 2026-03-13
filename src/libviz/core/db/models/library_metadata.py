@@ -13,11 +13,9 @@ class LibraryMetadata(Base):
         default=datetime.now,
         nullable=False
     )
-    created_version = Column(String(10), nullable=False)
     last_updated_on = Column(
         DateTime(timezone=True),
         default=datetime.now,
         onupdate=datetime.now,
         nullable=False
     )
-    actual_version = Column(String(10), nullable=False)

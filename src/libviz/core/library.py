@@ -20,8 +20,6 @@ from libviz.core.utils import parse_msp, calculate_exact_mass, infer_precursor_d
 
 logger = logging.getLogger(__name__)
 
-VERSION = "1.0.0"
-
 class Library:
     def __init__(self, name: str, path: Path):
         self.path: Path = path
@@ -47,9 +45,7 @@ class Library:
 
         with lib.session_scope() as session:
             meta = LibraryMetadata(
-                name = name,
-                created_version=VERSION,
-                actual_version=VERSION,
+                name = name
             )
             session.add(meta)
             session.commit()
