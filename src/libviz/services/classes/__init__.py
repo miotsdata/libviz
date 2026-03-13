@@ -1,1 +1,1 @@
-from .library import Library
+from ...core.library import Library

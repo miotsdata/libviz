@@ -1,16 +1,22 @@
 from pathlib import Path
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import sessionmaker, Session
 import numpy as np
 import logging
 import tempfile
 import sqlite3
 
-from libviz.services.db.extensions import Base
-from libviz.services.db.models import Compound, Spectrum, LibraryMetadata, SpectrumMetadata, AdductType
-from libviz.services.db.models.adducts_type import populate_adduct_types
-from libviz.services.db.models.spectrum import calculate_spectrum_hash
-from libviz.utils import parse_msp, calculate_exact_mass, infer_precursor_delta
+from libviz.core.db.extensions import Base
+from libviz.core.db.models import (
+    Compound,
+    Spectrum,
+    LibraryMetadata,
+    SpectrumMetadata,
+    AdductType,
+    populate_adduct_types,  
+    calculate_spectrum_hash
+)
+from libviz.core.utils import parse_msp, calculate_exact_mass, infer_precursor_delta
 
 logger = logging.getLogger(__name__)
 
@@ -18,25 +24,30 @@ VERSION = "1.0.0"
 
 class Library:
     def __init__(self, name: str, path: Path):
-        self.path = path
-        self.is_temp = True
-        self.name = name
-        self.engine = create_engine(f"sqlite:///{self.path}", future=True)
-        self.Session = sessionmaker(bind=self.engine, future=True)
+        self.path: Path = path
+        self.is_temp: bool = True
+        self.name: str = name
+        self.engine: Engine = create_engine(f"sqlite:///{self.path}", future=True)
+        self.session_maker = sessionmaker(bind=self.engine, future=True)
         self.n_compounds = 0
         self.n_spectra = 0
 
-    # ---------- lifecycle ----------
+    @classmethod
+    def create(cls, path: str | Path, name: str):
+        if path.exists():
+            raise FileExistsError(f"Library already exists at path {str(path)}")
 
-    def create(self):
-        if self.path.exists():
-            raise FileExistsError(f"Library already exists: {self.path}")
+        if not isinstance(path, (str, Path)):
+            raise TypeError(f"Path should be either str or Path, found {type(path).__name__}")
 
-        Base.metadata.create_all(self.engine)
+        path = Path(path) if isinstance(path, str) else path
+        lib = cls(name = name, path=path)
 
-        with self.session_scope() as session:
+        Base.metadata.create_all(lib.engine)
+
+        with lib.session_scope() as session:
             meta = LibraryMetadata(
-                name = self.name,
+                name = name,
                 created_version=VERSION,
                 actual_version=VERSION,
             )
@@ -44,11 +55,31 @@ class Library:
             session.commit()
 
             populate_adduct_types(session)
+        return lib
+    
+    # ---------- session handling ----------
+    def session_scope(self):
+        class _SessionContext:
+            def __init__(self, lib):
+                self.lib = lib
+                self.session = None
 
+            def __enter__(self):
+                self.session = self.lib.Session()
+                return self.session
 
+            def __exit__(self, exc_type, exc, tb):
+                if exc:
+                    self.session.rollback()
+                else:
+                    self.session.commit()
+                self.session.close()
+
+        return _SessionContext(self)
+
+"""
     @classmethod
     def load_from_db(cls, path: Path):
-        """Load a library from an existing database path."""
         if not Path(path).exists():
             raise FileNotFoundError(path)
 
@@ -63,7 +94,7 @@ class Library:
 
         # Create instance
         lib = cls(name=name, path=Path(path))
-        session = lib.Session()
+        session = lib.session_maker()
         lib.n_compounds = session.query(Compound).count()
         lib.n_spectra = session.query(Spectrum).count()
         lib.is_temp = False
@@ -72,10 +103,6 @@ class Library:
 
     @classmethod
     def loadFromMSP(cls, msp_path: str):
-        """
-        Load a library from an MSP file into an in-memory SQLite database.
-        Returns a Library instance.
-        """
 
         # Create in-memory SQLite DB
         # Create temporary DB file
@@ -120,33 +147,13 @@ class Library:
         # Create Library instance
         lib = cls(name="NONAME", path=db_path)
         lib.engine = engine
-        lib.Session = Session_db
+        lib.session_maker = Session_db
         lib.n_compounds = session.query(Compound).count()
         lib.n_spectra = session.query(Spectrum).count()
         lib.is_temp = True
 
         session.close()
         return lib
-
-    # ---------- session handling ----------
-    def session_scope(self):
-        class _SessionContext:
-            def __init__(self, lib):
-                self.lib = lib
-                self.session = None
-
-            def __enter__(self):
-                self.session = self.lib.Session()
-                return self.session
-
-            def __exit__(self, exc_type, exc, tb):
-                if exc:
-                    self.session.rollback()
-                else:
-                    self.session.commit()
-                self.session.close()
-
-        return _SessionContext(self)
 
     # ---------- helpers ----------
 
@@ -390,3 +397,4 @@ class Library:
             meta.name = new_name
             session.commit()
             self.name = new_name
+"""
