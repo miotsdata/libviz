@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from datetime import datetime
 
-from libviz.services.db.extensions import Base
+from libviz.core.db import Base
 
 class LibraryMetadata(Base):
     __tablename__ = "library_metadata"

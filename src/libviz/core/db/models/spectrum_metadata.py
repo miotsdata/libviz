@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 
-from libviz.services.db.extensions import Base
+from libviz.core.db import Base
 
 class SpectrumMetadata(Base):
     __tablename__ = "spectrum_metadata"

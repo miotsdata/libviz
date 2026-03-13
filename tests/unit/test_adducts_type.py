@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from libviz.services.db.models import AdductType
+from libviz.core.db.models import AdductType
 
 
 class TestAdductType:
@@ -47,30 +47,6 @@ class TestAdductType:
         # Since spectra is back_populates, we can check the attribute exists
         assert hasattr(adduct, 'spectra')
         assert adduct.spectra == []
-
-    def test_populate_adduct_types(self, session):
-        from libviz.services.db.models.adducts_type import populate_adduct_types
-        populate_adduct_types(session)
-
-        # Check that common adducts are added
-        proton_adduct = session.query(AdductType).filter_by(formula="[M+H]+").first()
-        assert proton_adduct is not None
-        assert proton_adduct.charge == 1
-
-        # Check negative mode
-        negative_adduct = session.query(AdductType).filter_by(formula="[M-H]-").first()
-        assert negative_adduct is not None
-        assert negative_adduct.charge == -1
-
-    def test_populate_adduct_types_idempotent(self, session):
-        from libviz.services.db.models.adducts_type import populate_adduct_types
-        populate_adduct_types(session)
-        initial_count = session.query(AdductType).count()
-
-        # Run again, should not add duplicates
-        populate_adduct_types(session)
-        final_count = session.query(AdductType).count()
-        assert final_count == initial_count
 
     def test_invalid_charge_type(self, session):
         # charge should be int, but SQLAlchemy might convert

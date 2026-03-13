@@ -14,7 +14,7 @@ from libviz.utils import parse_msp, calculate_exact_mass, infer_precursor_delta
 
 logger = logging.getLogger(__name__)
 
-VERSION = "1"
+VERSION = "1.0.0"
 
 class Library:
     def __init__(self, name: str, path: Path):

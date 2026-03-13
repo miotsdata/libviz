@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from libviz.services.db.extensions import Base
+from libviz.core.db import Base
 
 
 @pytest.fixture(scope="module")

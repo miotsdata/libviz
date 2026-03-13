@@ -1,8 +1,8 @@
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 
-from libviz.services.db.models import LibraryMetadata
+from libviz.core.db.models import LibraryMetadata
 
 
 class TestLibraryMetadata:

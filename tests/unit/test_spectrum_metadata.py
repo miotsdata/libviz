@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from libviz.services.db.models import SpectrumMetadata, Spectrum, Compound, AdductType
+from libviz.core.db.models import SpectrumMetadata, Spectrum, Compound, AdductType
 
 # ------------ HELPERS
 def get_or_create_compound(session, inchikey="TESTINCHI"):

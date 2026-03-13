@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, Float, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-from libviz.services.db.extensions import Base
+from libviz.core.db import Base
 
 class Compound(Base):
     __tablename__ = "compound"

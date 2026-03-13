@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float
 from sqlalchemy.orm import relationship
 
-from libviz.services.db.extensions import Base
+from libviz.core.db import Base
 
 PROTON = 1.007276466812
 ELECTRON = 0.000548579909065  # optional, often ignored

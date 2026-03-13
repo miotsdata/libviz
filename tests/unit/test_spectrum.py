@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 
-from libviz.services.db.models import Spectrum, Compound, AdductType, calculate_spectrum_hash
+from libviz.core.db.models import Spectrum, Compound, AdductType, calculate_spectrum_hash
 
 
 # ------------ HELPERS

@@ -5,7 +5,7 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Lar
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-from libviz.services.db.extensions import Base
+from libviz.core.db import Base
 
 class Spectrum(Base):
     __tablename__ = "spectrum"
