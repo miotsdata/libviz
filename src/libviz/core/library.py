@@ -268,22 +268,26 @@ class Library:
             session.add(spectrum)
 
 
-    """
-
-    
-
-
     def find_identical_spectra(self, precursor_mz: float, polarity: str, hash_ref: str,
                                ppm_tolerance: float = 5):
+        if precursor_mz <= 0:
+            raise ValueError("precursor_mz must be a positive number")
+        
+        if polarity not in ("positive", "negative"):
+            raise ValueError("polarity must be either 'positive' or 'negative'")
+        
+        if not isinstance(hash_ref, str) or not hash_ref:
+            raise ValueError("hash_ref must be a non-empty string")
+        
+        if ppm_tolerance < 0:
+            raise ValueError("ppm_tolerance must be a non-negative number")
+
         matches = []
         with self.session_scope() as session:
             candidates = session.query(Spectrum).filter_by(
                 polarity=polarity,
                 spectrum_hash=hash_ref
             ).all()
-
-            if not candidates:
-                return matches
 
             for spectrum in candidates:
                 ppm_diff = abs(spectrum.precursor_mz - precursor_mz) / precursor_mz * 1e6
@@ -301,34 +305,37 @@ class Library:
             return spectrum.compound_id
 
 
-    def get_identical_spectra_compounds(self, spectrum_id: int):
+    def get_identical_spectra_compounds(self, spectrum_id: int, ppm_tolerance: float = 5):
+
+        if not isinstance(spectrum_id, int):
+            raise ValueError("spectrum_id must be an integer")
+        
+        if not isinstance(ppm_tolerance, (int, float)):
+            raise ValueError("ppm_tolerance must be a number")
+        
+        if ppm_tolerance < 0:
+            raise ValueError("ppm_tolerance must be a non-negative number")
+
         with self.session_scope() as session:
             spectrum = session.query(Spectrum).filter_by(id=spectrum_id).one_or_none()
             if spectrum is None:
                 raise ValueError(f"Spectrum with ID {spectrum_id} not found")
 
-            identical_spectra_ids = self.find_identical_spectra(
-                precursor_mz=spectrum.precursor_mz,
-                polarity=spectrum.polarity,
-                hash_ref=spectrum.spectrum_hash
+            candidates = (
+                session.query(Spectrum, Compound)
+                .join(Compound, Compound.id == Spectrum.compound_id)
+                .filter(
+                    Spectrum.polarity == spectrum.polarity,
+                    Spectrum.spectrum_hash == spectrum.spectrum_hash,
+                    Spectrum.id != spectrum_id
+                )
+                .all()
             )
 
-            identical_spectra_ids = [sid for sid in identical_spectra_ids if sid != spectrum_id]
-
-            logger.debug("Found %d identical spectra for spectrum ID %d", len(identical_spectra_ids), spectrum_id)
-
             compounds = []
-            for spec_id in identical_spectra_ids:
-                spec = session.query(Spectrum).filter_by(id=spec_id).one()
-                comp = session.query(Compound).filter_by(id=spec.compound_id).one()
-                compounds.append({
-                    "id": comp.id,
-                    "name": comp.name,
-                    "formula": comp.formula
-                })
+            for candidate_spectrum, comp in candidates:
+                ppm_diff = abs(candidate_spectrum.precursor_mz - spectrum.precursor_mz) / spectrum.precursor_mz * 1e6
+                if ppm_diff <= ppm_tolerance:
+                    compounds.append({"id": comp.id, "name": comp.name, "formula": comp.formula})
 
             return compounds
-
-
-
-"""

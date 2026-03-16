@@ -20,6 +20,14 @@ from libviz.core.utils import (
 
 logger = logging.getLogger(__name__)
 
+POLARITY_MAP = {
+    "positive": "POSITIVE",
+    "pos": "POSITIVE",
+    "p": "POSITIVE",
+    "negative": "NEGATIVE",
+    "neg": "NEGATIVE",
+    "n": "NEGATIVE",
+}
 
 class MSPReader:
 
@@ -154,7 +162,7 @@ class MSPReader:
             compound_id=compound_id,
             precursor_mz=float(entry["PRECURSORMZ"]),
             adduct_type_id=adduct_id,
-            polarity=entry.get("IONMODE"),
+            polarity=self._normalize_polarity(entry.get("IONMODE")),
             collision_energy=float(entry.get("COLLISIONENERGY") or 0.0),
             spectrum_hash=spectrum_hash,
             mz_array=mz,
@@ -200,3 +208,12 @@ class MSPReader:
 
         if rows:
             self.session.execute(insert(SpectrumMetadata), rows)
+
+
+    def _normalize_polarity(self, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = POLARITY_MAP.get(value.strip().lower())
+        if normalized is None:
+            logger.warning("Unrecognized polarity value: %s", value)
+        return normalized

@@ -8,6 +8,20 @@ import sqlite3
 from pathlib import Path
 import numpy as np
 
+# pylint: disable=redefined-outer-name, protected-access, unused-argument, unused-variable
+
+# ---- helpers ----
+
+def _spectra_info(precursor_mz: float, mz=None, intensity=None) -> dict:
+    return {
+        "precursor_mz": precursor_mz,
+        "polarity": "POSITIVE",
+        "collision_energy": 20.0,
+        "mz": mz if mz is not None else np.array([50.0, 60.0], dtype=np.float32),
+        "intensity": intensity if intensity is not None else np.array([100.0, 50.0], dtype=np.float32),
+    }
+
+
 
 # ---- fixtures ----
 
@@ -87,6 +101,32 @@ def spectra_info():
         "mz": np.array([50.0, 60.0], dtype=np.float32),
         "intensity": np.array([100.0, 50.0], dtype=np.float32),
     }
+
+@pytest.fixture
+def two_identical_spectra(loaded_library, adduct_id) -> dict:
+    """Two compounds with identical peaks and precursor_mz — should match each other."""
+    mz = np.array([50.0, 60.0], dtype=np.float32)
+    intensity = np.array([100.0, 50.0], dtype=np.float32)
+
+    loaded_library.add_spectra("aspirin", "C9H8O4", "INCHI-ASPIRIN", _spectra_info(100.0, mz, intensity), adduct_id)
+    loaded_library.add_spectra("ibuprofen", "C13H18O2", "INCHI-IBUPROFEN", _spectra_info(100.0, mz, intensity), adduct_id)
+
+    with loaded_library.session_scope() as session:
+        s1 = session.query(Spectrum).filter_by(precursor_mz=100.0).first()
+        s2 = session.query(Spectrum).filter_by(precursor_mz=100.0).offset(1).first()
+        return {"s1_id": s1.id, "s2_id": s2.id}
+
+
+@pytest.fixture
+def unique_spectrum(loaded_library, adduct_id) -> int:
+    """One spectrum with unique peaks — no matches."""
+    loaded_library.add_spectra(
+        "unique_cmpd", "C2H6O", "INCHI-UNIQUE",
+        _spectra_info(200.0, np.array([99.0], dtype=np.float32), np.array([999.0], dtype=np.float32)),
+        adduct_id
+    )
+    with loaded_library.session_scope() as session:
+        return session.query(Spectrum).filter_by(precursor_mz=200.0).one().id
 
 # ---- TESTS ----
 def test_library_init(tmp_path):
@@ -442,3 +482,75 @@ def test_add_spectra_none_adduct_does_not_create_compound(loaded_library, spectr
 
     with loaded_library.session_scope() as session:
         assert session.query(Compound).count() == initial_count
+
+
+def test_get_compound_id_returns_int(loaded_library, two_identical_spectra):
+    compound_id = loaded_library.get_compound_id_from_spectrum_id(two_identical_spectra["s1_id"])
+    assert isinstance(compound_id, int)
+
+
+def test_get_compound_id_correct_value(loaded_library, two_identical_spectra):
+    with loaded_library.session_scope() as session:
+        spectrum = session.query(Spectrum).filter_by(id=two_identical_spectra["s1_id"]).one()
+        expected = spectrum.compound_id
+
+    result = loaded_library.get_compound_id_from_spectrum_id(two_identical_spectra["s1_id"])
+    assert result == expected
+
+
+def test_get_compound_id_invalid_id_raises(loaded_library):
+    with pytest.raises(ValueError, match="not found"):
+        loaded_library.get_compound_id_from_spectrum_id(99999)
+
+
+def test_get_identical_spectra_compounds_returns_list(loaded_library, two_identical_spectra):
+    result = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
+    assert isinstance(result, list)
+
+
+def test_get_identical_spectra_compounds_finds_match(loaded_library, two_identical_spectra):
+    result = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
+    assert len(result) == 1
+
+
+def test_get_identical_spectra_compounds_dict_keys(loaded_library, two_identical_spectra):
+    result = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
+    assert set(result[0].keys()) == {"id", "name", "formula"}
+
+
+def test_get_identical_spectra_compounds_correct_compound(loaded_library, two_identical_spectra):
+    result = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
+    names = [c["name"] for c in result]
+    assert "ibuprofen" in names
+
+
+def test_get_identical_spectra_compounds_excludes_self(loaded_library, two_identical_spectra):
+    s1_compound_id = loaded_library.get_compound_id_from_spectrum_id(two_identical_spectra["s1_id"])
+    result = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
+    compound_ids = [c["id"] for c in result]
+    assert s1_compound_id not in compound_ids
+
+
+def test_get_identical_spectra_compounds_no_match(loaded_library, unique_spectrum):
+    result = loaded_library.get_identical_spectra_compounds(unique_spectrum)
+    assert result == []
+
+
+def test_get_identical_spectra_compounds_invalid_id_raises(loaded_library):
+    with pytest.raises(ValueError, match="not found"):
+        loaded_library.get_identical_spectra_compounds(99999)
+
+
+def test_get_identical_spectra_compounds_symmetry(loaded_library, two_identical_spectra):
+    """If s1 matches s2, then s2 should also match s1."""
+    from_s1 = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
+    from_s2 = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s2_id"])
+
+    ids_from_s1 = {c["id"] for c in from_s1}
+    ids_from_s2 = {c["id"] for c in from_s2}
+
+    s1_compound = loaded_library.get_compound_id_from_spectrum_id(two_identical_spectra["s1_id"])
+    s2_compound = loaded_library.get_compound_id_from_spectrum_id(two_identical_spectra["s2_id"])
+
+    assert s2_compound in ids_from_s1
+    assert s1_compound in ids_from_s2

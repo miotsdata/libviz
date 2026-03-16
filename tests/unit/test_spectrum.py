@@ -46,7 +46,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz_array=b'\x00\x00\x80\x3f\x00\x00\x00\x40',  # 1.0, 2.0
             intensity_array=b'\x00\x00\x80\x3f\x00\x00\x00\x40',  # 1.0, 2.0
@@ -59,11 +59,44 @@ class TestSpectrum:
         assert spectrum.compound_id == compound.id
         assert spectrum.precursor_mz == 181.0
         assert spectrum.adduct_type_id == adduct.id
-        assert spectrum.polarity == "positive"
+        assert spectrum.polarity == "POSITIVE"
         assert spectrum.collision_energy == 25.0
         assert spectrum.added_on is not None
 
     def test_unique_constraint(self, session):
+        compound = get_or_create_compound(session, "SPECTRUMINCHI")
+        adduct = get_or_create_adduct(session)
+        session.add_all([compound, adduct])
+        session.commit()
+
+        spectrum1 = Spectrum(
+            compound_id=compound.id,
+            precursor_mz=181.0,
+            adduct_type_id=adduct.id,
+            polarity="POSITIVE",
+            collision_energy=25.0,
+            mz_array=b'\x00\x00\x80\x3f',
+            intensity_array=b'\x00\x00\x80\x3f',
+            spectrum_hash="samehash"
+        )
+        spectrum2 = Spectrum(
+            compound_id=compound.id,
+            precursor_mz=181.0,
+            adduct_type_id=adduct.id,
+            polarity="POSITIVE",
+            collision_energy=25.0,
+            mz_array=b'\x00\x00\x80\x3f',
+            intensity_array=b'\x00\x00\x80\x3f',
+            spectrum_hash="samehash"
+        )
+        session.add(spectrum1)
+        session.commit()
+
+        session.add(spectrum2)
+        with pytest.raises(IntegrityError):
+            session.commit()
+    
+    def test_polarity_constraint(self, session):
         compound = get_or_create_compound(session, "SPECTRUMINCHI")
         adduct = get_or_create_adduct(session)
         session.add_all([compound, adduct])
@@ -79,20 +112,8 @@ class TestSpectrum:
             intensity_array=b'\x00\x00\x80\x3f',
             spectrum_hash="samehash"
         )
-        spectrum2 = Spectrum(
-            compound_id=compound.id,
-            precursor_mz=181.0,
-            adduct_type_id=adduct.id,
-            polarity="positive",
-            collision_energy=25.0,
-            mz_array=b'\x00\x00\x80\x3f',
-            intensity_array=b'\x00\x00\x80\x3f',
-            spectrum_hash="samehash"
-        )
         session.add(spectrum1)
-        session.commit()
 
-        session.add(spectrum2)
         with pytest.raises(IntegrityError):
             session.commit()
 
@@ -109,7 +130,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz=mz,
             intensity=intensity
@@ -134,7 +155,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz_array=mz_data.tobytes(),
             intensity_array=b'\x00\x00\x80\x3f\x00\x00\x00\x40\x00\x00\x40\x40',
@@ -157,7 +178,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz_array=b'\x00\x00\x80\x3f\x00\x00\x00\x40\x00\x00\x40\x40',
             intensity_array=intensity_data.tobytes(),
@@ -192,7 +213,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz_array=b'\x00\x00\x80\x3f',
             intensity_array=b'\x00\x00\x80\x3f',
@@ -215,7 +236,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="negative",
+            polarity="NEGATIVE",
             collision_energy=25.0,
             mz_array=b'\x00\x00\x80\x3f',
             intensity_array=b'\x00\x00\x80\x3f',
@@ -224,7 +245,7 @@ class TestSpectrum:
         session.add(spectrum)
         session.commit()
 
-        found = session.query(Spectrum).filter_by(polarity="negative").first()
+        found = session.query(Spectrum).filter_by(polarity="NEGATIVE").first()
         assert found is not None
 
     def test_collision_energy_indexed(self, session):
@@ -237,7 +258,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=35.0,
             mz_array=b'\x00\x00\x80\x3f',
             intensity_array=b'\x00\x00\x80\x3f',
@@ -259,7 +280,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=200.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz_array=b'\x00\x00\x80\x3f',
             intensity_array=b'\x00\x00\x80\x3f',
@@ -281,7 +302,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz_array=b'\x00\x00\x80\x3f',
             intensity_array=b'\x00\x00\x80\x3f',
@@ -303,7 +324,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz_array=b'\x00\x00\x80\x3f',
             intensity_array=b'\x00\x00\x80\x3f',
@@ -320,7 +341,7 @@ class TestSpectrum:
             compound_id=999,
             precursor_mz=181.0,
             adduct_type_id=1,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz_array=b'\x00\x00\x80\x3f',
             intensity_array=b'\x00\x00\x80\x3f',
@@ -340,7 +361,7 @@ class TestSpectrum:
         spectrum = Spectrum(
             compound_id=compound.id,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz_array=b'\x00\x00\x80\x3f',
             intensity_array=b'\x00\x00\x80\x3f',
@@ -357,7 +378,7 @@ class TestSpectrum:
         session.commit()
 
         # Test various polarity values
-        for pol in ["positive", "negative", "neutral"]:
+        for pol in ["POSITIVE", "NEGATIVE"]:
             spectrum = Spectrum(
                 compound_id=compound.id,
                 precursor_mz=181.0,
@@ -381,7 +402,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=0.0,
             mz_array=b'\x00\x00\x80\x3f',
             intensity_array=b'\x00\x00\x80\x3f',
@@ -405,7 +426,7 @@ class TestSpectrum:
             compound_id=compound.id,
             precursor_mz=181.0,
             adduct_type_id=adduct.id,
-            polarity="positive",
+            polarity="POSITIVE",
             collision_energy=25.0,
             mz=mz,
             intensity=intensity
@@ -451,3 +472,4 @@ def test_spectrum_hash_order_changes_hash():
     h2 = calculate_spectrum_hash(mz2, intensity2)
 
     assert h1 != h2
+

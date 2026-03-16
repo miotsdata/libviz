@@ -1,7 +1,7 @@
 import hashlib
 import numpy as np
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, LargeBinary, UniqueConstraint
+from sqlalchemy import CheckConstraint, Column, Integer, String, Float, DateTime, ForeignKey, LargeBinary, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -14,7 +14,7 @@ class Spectrum(Base):
     compound_id = Column(Integer, ForeignKey("compound.id"), nullable=False)
     precursor_mz = Column(Float, index=True, nullable=False)
     adduct_type_id = Column(Integer, ForeignKey("adduct_type.id"), nullable=False)
-    polarity = Column(String, index=True, nullable=False)
+    polarity = Column(String, CheckConstraint("polarity IN ('POSITIVE', 'NEGATIVE')"), nullable=True, index=True)
     collision_energy = Column(Float, index=True, nullable=False)
     mz_array = Column(LargeBinary, nullable=False)
     intensity_array = Column(LargeBinary, nullable=False)

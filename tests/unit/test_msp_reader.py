@@ -269,3 +269,17 @@ def test_import_file(session):
         reader.import_file("dummy.msp")
 
     assert session.query(Compound).count() == 3
+
+
+def test_normalize_polarity(session):
+
+    reader = MSPReader(session)
+
+    assert reader._normalize_polarity("positive") == "POSITIVE"
+    assert reader._normalize_polarity("POS") == "POSITIVE"
+    assert reader._normalize_polarity("p") == "POSITIVE"
+    assert reader._normalize_polarity("negative") == "NEGATIVE"
+    assert reader._normalize_polarity("NEG") == "NEGATIVE"
+    assert reader._normalize_polarity("n") == "NEGATIVE"
+    assert reader._normalize_polarity("unknown") is None
+    assert reader._normalize_polarity(None) is None
