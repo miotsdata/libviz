@@ -415,3 +415,39 @@ class TestSpectrum:
 
         assert len(spectrum.mz_numpy()) == 10000
         assert len(spectrum.intensity_numpy()) == 10000
+
+
+def test_spectrum_hash_same_arrays():
+    mz = np.array([100.0, 200.0, 300.0], dtype=np.float32)
+    intensity = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+
+    h1 = calculate_spectrum_hash(mz, intensity)
+    h2 = calculate_spectrum_hash(mz, intensity)
+
+    assert h1 == h2
+
+
+def test_spectrum_hash_different_arrays():
+    mz1 = np.array([100, 200, 300], dtype=np.float32)
+    intensity1 = np.array([10, 20, 30], dtype=np.float32)
+
+    mz2 = np.array([100, 200, 301], dtype=np.float32)
+    intensity2 = np.array([10, 20, 30], dtype=np.float32)
+
+    h1 = calculate_spectrum_hash(mz1, intensity1)
+    h2 = calculate_spectrum_hash(mz2, intensity2)
+
+    assert h1 != h2
+
+
+def test_spectrum_hash_order_changes_hash():
+    mz1 = np.array([100, 200, 300], dtype=np.float32)
+    intensity1 = np.array([10, 20, 30], dtype=np.float32)
+
+    mz2 = np.array([300, 200, 100], dtype=np.float32)
+    intensity2 = np.array([30, 20, 10], dtype=np.float32)
+
+    h1 = calculate_spectrum_hash(mz1, intensity1)
+    h2 = calculate_spectrum_hash(mz2, intensity2)
+
+    assert h1 != h2

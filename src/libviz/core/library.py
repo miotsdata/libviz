@@ -1,23 +1,19 @@
 from pathlib import Path
-from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import sessionmaker, Session
-import numpy as np
+from sqlalchemy import Engine, create_engine, event
+from sqlalchemy.orm import sessionmaker
 import logging
 import tempfile
 import sqlite3
 
-from libviz.core.db.extensions import Base
 from libviz.core.db.migrations import upgrade_library_schema
+from libviz.core.readers import MSPReader
+
 from libviz.core.db.models import (
     Compound,
     Spectrum,
     LibraryMetadata,
-    SpectrumMetadata,
-    AdductType,
-    populate_adduct_types,  
-    calculate_spectrum_hash
+    populate_adduct_types
 )
-from libviz.core.utils import parse_msp, calculate_exact_mass, infer_precursor_delta
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +26,14 @@ class Library:
         self.session_maker = sessionmaker(bind=self.engine, future=True)
         self.n_compounds = 0
         self.n_spectra = 0
+
+        @event.listens_for(self.engine, "connect")
+        def enable_sqlite_fk(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA journal_mode=MEMORY")
+            cursor.execute("PRAGMA synchronous=OFF")
+            cursor.close()
 
     @classmethod
     def create(cls, path: str | Path, name: str):
@@ -77,7 +81,7 @@ class Library:
         return _SessionContext(self)
 
 
-     # ---------- Saving ----------
+    # ---------- Saving ----------
     def save_as_db(self, path: str | Path):
         logger.debug("Saving library to %s", path)
 
@@ -107,6 +111,33 @@ class Library:
         self.is_temp = False
         logger.debug("Saved library to %s", path)
 
+
+    # ---------- Loading ----------
+    @classmethod
+    def loadFromMSP(cls, msp_path: str):
+
+        tmp_file = tempfile.NamedTemporaryFile(
+            suffix=".db",
+            delete=False
+        )
+        tmp_file.close()
+
+        db_path = tmp_file.name
+
+        lib = cls.create(name="In-memory MSP Library", path=db_path)
+
+        with lib.session_scope() as session:
+
+            reader = MSPReader(session)
+            reader.import_file(msp_path)
+
+            lib.n_compounds = session.query(Compound).count()
+            lib.n_spectra = session.query(Spectrum).count()
+
+        lib.is_temp = True
+
+        return lib
+
 """
     @classmethod
     def load_from_db(cls, path: str | Path):
@@ -134,159 +165,9 @@ class Library:
         return lib
 
 
-    @classmethod
-    def loadFromMSP(cls, msp_path: str):
+    
 
-        # Create in-memory SQLite DB
-        # Create temporary DB file
-        tmp_file = tempfile.NamedTemporaryFile(
-            suffix=".db",
-            delete=False
-        )
-        tmp_file.close()
-
-        db_path = tmp_file.name
-        logger.debug(f"Temporary database path: {db_path}")
-
-        engine = create_engine(
-            f"sqlite:///{db_path}",
-            future=True
-        )
-
-        Session_db = sessionmaker(
-            bind=engine,
-            expire_on_commit=False
-        )
-        Base.metadata.create_all(engine)  # create tables
-
-        session = Session_db()
-
-        # Create metadata entry
-        meta = LibraryMetadata(name="In-memory MSP Library", created_version=VERSION, actual_version=VERSION)
-        session.add(meta)
-        session.commit()
-
-        populate_adduct_types(session)
-
-        # Parse MSP file
-        parse_msp_generator = parse_msp(msp_path)
-
-        for i, compound_data in enumerate(parse_msp_generator, 1):
-            cls._insert_msp_entry(session, compound_data)
-            if i % 500 == 0:
-                session.commit()
-        session.commit()
-
-        # Create Library instance
-        lib = cls(name="NONAME", path=db_path)
-        lib.engine = engine
-        lib.session_maker = Session_db
-        lib.n_compounds = session.query(Compound).count()
-        lib.n_spectra = session.query(Spectrum).count()
-        lib.is_temp = True
-
-        session.close()
-        return lib
-
-    # ---------- helpers ----------
-
-    @staticmethod
-    def _insert_msp_entry(session: Session, entry):
-        # ---------- prepare mz/intensity ----------
-        mz = np.array([float(m) for m, _ in entry.get("peaks", [])], dtype=np.float32)
-        intensity = np.array([float(i) for _, i in entry.get("peaks", [])], dtype=np.float32)
-
-        # sort to make hash deterministic
-        order = np.argsort(mz)
-        mz = mz[order]
-        intensity = intensity[order]
-
-        spectrum_hash = calculate_spectrum_hash(mz, intensity)
-
-        # ---------- precursor type ----------
-        adduct_type_formula = entry.get("PRECURSORTYPE")
-        adduct_type = session.query(AdductType).filter_by(
-            formula=adduct_type_formula
-        ).one_or_none()
-
-        if adduct_type is None:
-            try:
-                charge, delta = infer_precursor_delta(adduct_type_formula)
-            except ValueError:
-                # Skip unusual precursors
-                logger.warning("Skipping precursor: %s", adduct_type_formula)
-                return
-            adduct_type = AdductType(
-                formula=adduct_type_formula,
-                delta_mass=delta,
-                charge=charge
-            )
-            session.add(adduct_type)
-            session.flush()
-
-        # ---------- compound ----------
-        inchikey = entry.get("INCHIKEY")
-        compound = None
-        if inchikey:
-            compound = session.query(Compound).filter_by(inchikey=inchikey).one_or_none()
-
-
-        if compound is None:
-            compound = Compound(
-                name=entry.get("NAME"),
-                formula=entry.get("FORMULA"),
-                inchikey=inchikey,
-                exact_mass=float(entry["EXACTMASS"]) if "EXACTMASS" in entry else calculate_exact_mass(entry.get("FORMULA")),
-            )
-            session.add(compound)
-            session.flush()  # get compound.id
-
-        
-        # ---------- check if spectrum already exists ----------
-        existing = session.query(Spectrum).filter_by(
-            compound_id=compound.id,
-            adduct_type_id=adduct_type.id,
-            polarity=entry.get("IONMODE"),
-            collision_energy = float(entry.get("COLLISIONENERGY") or 0.0),
-            spectrum_hash=spectrum_hash
-        ).one_or_none()
-
-        if existing:
-            # spectrum already in DB → skip everything
-            return existing
-
-        # ---------- peaks / spectrum ----------
-        spectrum = Spectrum.from_arrays(
-            compound_id=compound.id,
-            precursor_mz=float(entry["PRECURSORMZ"]),
-            adduct_type_id=adduct_type.id,
-            polarity=entry.get("IONMODE"),
-            collision_energy=float(entry.get("COLLISIONENERGY") or 0.0),
-            mz=mz,
-            intensity=intensity,
-        )
-
-        session.add(spectrum)
-        session.flush()
-
-        # ---------- spectrum metadata ----------
-        known_keys = {
-            "NAME", "FORMULA", "INCHIKEY", "EXACTMASS",
-            "PRECURSORMZ", "PRECURSORTYPE",
-            "IONMODE", "COLLISIONENERGY", "peaks"
-        }
-
-        for key, value in entry.items():
-            if key not in known_keys:
-                session.add(
-                    SpectrumMetadata(
-                        spectrum_id=spectrum.id,
-                        key=key,
-                        value=str(value)
-                    )
-                )
-
-        return spectrum
+    
 
     def get_adducts(self):
         with self.session_scope() as session:

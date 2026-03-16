@@ -29,3 +29,15 @@ def session(engine):
     yield db_session
     db_session.rollback()
     db_session.close()
+
+@pytest.fixture(scope="module")
+def reader_session(tmp_path):
+    db = tmp_path / "test.db"
+
+    engine = create_engine(f"sqlite:///{db}", future=True)
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(bind=engine)
+
+    with Session() as s:
+        yield s
