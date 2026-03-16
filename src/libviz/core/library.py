@@ -15,6 +15,7 @@ from libviz.core.db.models import (
     AdductType,
     populate_adduct_types
 )
+from libviz.core.utils.mass_calulation_utils import calculate_exact_mass
 
 logger = logging.getLogger(__name__)
 
@@ -199,33 +200,61 @@ class Library:
     def n_spectra(self):
         return self._n_spectra
 
+    def _get_or_insert_compound_by_inchikey(self, session,  name: str, formula: str, inchikey: str) -> Compound:
+
+        # Checks
+        if not isinstance(name, str) or not name:
+            raise ValueError("name must be a non-empty string")
+
+        if not isinstance(formula, str) or not formula:
+            raise ValueError("formula must be a non-empty string")
+
+        if not isinstance(inchikey, str) or not inchikey:
+            raise ValueError("inchikey must be a non-empty string")
+
+        compound = session.query(Compound).filter_by(inchikey=inchikey).one_or_none()
+        if compound is not None:
+            return compound
+
+        compound = Compound(
+            name=name,
+            formula=formula,
+            inchikey=inchikey,
+            exact_mass=calculate_exact_mass(formula),
+        )
+        session.add(compound)
+        session.flush()  # to get the ID assigned
+
+        return compound
 
 
+    def add_spectra(self, compound_name: str, compound_formula: str, inchikey: str, 
+                    spectra_info: dict, adduct_id: int):
 
+        # Checks
+        if not isinstance(compound_name, str) or not compound_name:
+            raise ValueError("compound_name must be a non-empty string")
+        
+        if not isinstance(compound_formula, str) or not compound_formula:
+            raise ValueError("compound_formula must be a non-empty string")
+        
+        if not isinstance(inchikey, str) or not inchikey:
+            raise ValueError("inchikey must be a non-empty string")
+        
+        if not isinstance(spectra_info, dict):
+            raise ValueError("spectra_info must be a dictionary")
 
-    """
+        if not isinstance(adduct_id, int):
+            raise ValueError("adduct_id must be an integer")
 
-    def add_spectra(self, compound_name: str, compound_formula: str, inchikey: str, spectra_info: dict, adduct_id: float):
+        # Get or insert compound
+        
+
         with self.session_scope() as session:
-            # Check if compound already exists
-            compound = None
-            if inchikey:
-                compound = session.query(Compound).filter_by(inchikey=inchikey).one_or_none()
-
-            if compound is None:
-                compound = Compound(
-                    name=compound_name,
-                    formula=compound_formula,
-                    inchikey=inchikey,
-                    exact_mass=calculate_exact_mass(compound_formula),
-                )
-                session.add(compound)
-                session.flush()  # get compound.id
-
-            # Add spectrum
-            if adduct_id is None:
-                raise ValueError("adduct_id is required in spectra_info")
-
+            compound = self._get_or_insert_compound_by_inchikey(session,
+                                                                compound_name,
+                                                                compound_formula,
+                                                                inchikey)
             spectrum = Spectrum.from_arrays(
                 compound_id=compound.id,
                 precursor_mz=spectra_info["precursor_mz"],
@@ -237,7 +266,11 @@ class Library:
             )
 
             session.add(spectrum)
-            session.commit()  # commit to get spectrum.id
+
+
+    """
+
+    
 
 
     def find_identical_spectra(self, precursor_mz: float, polarity: str, hash_ref: str,

@@ -2,10 +2,11 @@ import pytest
 from unittest.mock import patch, MagicMock
 from libviz.core.db.extensions import Base
 from libviz.core.library import Library
-from libviz.core.db.models import LibraryMetadata
+from libviz.core.db.models import LibraryMetadata, Compound, Spectrum
 from sqlalchemy import create_engine, inspect
 import sqlite3
 from pathlib import Path
+import numpy as np
 
 
 # ---- fixtures ----
@@ -50,9 +51,9 @@ def saved_library(tmp_path, monkeypatch) -> Path:
 
     monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: fake_entries)
 
-    lib = Library.loadFromMSP(Path("dummy.msp"))
+    loaded_library = Library.loadFromMSP(Path("dummy.msp"))
     db_path = Path(tmp_path / "test.db")
-    lib.save_as_db(db_path)
+    loaded_library.save_as_db(db_path)
 
     return db_path
 
@@ -67,45 +68,59 @@ def empty_library(tmp_path, monkeypatch):
     monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: [])
 
     db_path = tmp_path / "empty.db"
-    lib = Library.loadFromMSP(Path("dummy.msp"))
-    lib.save_as_db(db_path)
+    loaded_library = Library.loadFromMSP(Path("dummy.msp"))
+    loaded_library.save_as_db(db_path)
 
     return db_path
 
+@pytest.fixture
+def adduct_id(loaded_library) -> int:
+    return loaded_library.get_adducts()[0]["id"] 
+
+
+@pytest.fixture
+def spectra_info():
+    return {
+        "precursor_mz": 100.0,
+        "polarity": "POSITIVE",
+        "collision_energy": 20.0,
+        "mz": np.array([50.0, 60.0], dtype=np.float32),
+        "intensity": np.array([100.0, 50.0], dtype=np.float32),
+    }
 
 # ---- TESTS ----
 def test_library_init(tmp_path):
     lib_path = tmp_path / "test.db"
-    lib = Library(name="TestLib", path=lib_path)
+    loaded_library = Library(name="TestLib", path=lib_path)
 
-    assert lib.name == "TestLib"
-    assert lib.path == lib_path
-    assert lib.is_temp is True
-    assert lib.n_compounds == 0
-    assert lib.n_spectra == 0
-    assert lib.engine is not None
-    assert callable(lib.session_maker)
+    assert loaded_library.name == "TestLib"
+    assert loaded_library.path == lib_path
+    assert loaded_library.is_temp is True
+    assert loaded_library.n_compounds == 0
+    assert loaded_library.n_spectra == 0
+    assert loaded_library.engine is not None
+    assert callable(loaded_library.session_maker)
 
 
 def test_create_library_full(tmp_path):
     lib_path = tmp_path / "integration_test.db"
 
     # Create library (runs actual schema upgrade and adduct population)
-    lib = Library.create(path=lib_path, name="MyIntegrationLib")
+    loaded_library = Library.create(path=lib_path, name="MyIntegrationLib")
 
     # Ensure the library object is returned and DB file exists
-    assert isinstance(lib, Library)
-    assert lib.path.exists()
-    assert lib.name == "MyIntegrationLib"
+    assert isinstance(loaded_library, Library)
+    assert loaded_library.path.exists()
+    assert loaded_library.name == "MyIntegrationLib"
 
     # Check LibraryMetadata table has the entry
-    with lib.session_scope() as session:
+    with loaded_library.session_scope() as session:
         meta = session.query(LibraryMetadata).filter_by(name="MyIntegrationLib").first()
         assert meta is not None
         assert meta.name == "MyIntegrationLib"
 
     # Optionally check that expected tables exist (adduct types, etc.)
-    inspector = inspect(lib.engine)
+    inspector = inspect(loaded_library.engine)
     expected_tables = ["library_metadata", "adduct_type", "compound", "spectrum", "spectrum_metadata"]
     for table in expected_tables:
         assert table in inspector.get_table_names()
@@ -126,12 +141,12 @@ def test_create_invalid_path():
 
 def test_session_scope_commit(tmp_path):
     lib_path = tmp_path / "session_test.db"
-    lib = Library(name="TestSession", path=lib_path)
+    loaded_library = Library(name="TestSession", path=lib_path)
 
     # Use session_scope context to simulate commit
     # Patch the Library's Session to return a dummy session with commit/rollback
-    with patch.object(lib, "session_maker", return_value=MagicMock(commit=MagicMock(), rollback=MagicMock(), close=MagicMock())) as mock_session:
-        with lib.session_scope() as session:
+    with patch.object(loaded_library, "session_maker", return_value=MagicMock(commit=MagicMock(), rollback=MagicMock(), close=MagicMock())) as mock_session:
+        with loaded_library.session_scope() as session:
             assert session is not None
         # Ensure commit and close called
         session.commit.assert_called_once()
@@ -139,17 +154,17 @@ def test_session_scope_commit(tmp_path):
 
 
 def test_save_as_db_type_error(tmp_path):
-    lib = Library(name="TestLib", path=tmp_path / "src.db")
+    loaded_library = Library(name="TestLib", path=tmp_path / "src.db")
 
     with pytest.raises(TypeError):
-        lib.save_as_db(123)
+        loaded_library.save_as_db(123)
 
 
 def test_save_as_db_noname_error(tmp_path):
-    lib = Library(name="NONAME", path=tmp_path / "src.db")
+    loaded_library = Library(name="NONAME", path=tmp_path / "src.db")
 
     with pytest.raises(ValueError):
-        lib.save_as_db(tmp_path / "dest.db")
+        loaded_library.save_as_db(tmp_path / "dest.db")
 
 
 def test_save_as_db_success(tmp_path):
@@ -157,21 +172,21 @@ def test_save_as_db_success(tmp_path):
     dest_path = tmp_path / "dest.db"
 
     # create library and a real sqlite file
-    lib = Library.create(name="TestLib", path=src_path)
+    loaded_library = Library.create(name="TestLib", path=src_path)
 
     with sqlite3.connect(src_path) as conn:
         conn.execute("CREATE TABLE test (id INTEGER)")
         conn.execute("INSERT INTO test VALUES (1)")
         conn.commit()
 
-    lib.save_as_db(dest_path)
+    loaded_library.save_as_db(dest_path)
 
     # destination file exists
     assert dest_path.exists()
 
     # library internal state updated
-    assert lib.path == dest_path
-    assert lib.is_temp is False
+    assert loaded_library.path == dest_path
+    assert loaded_library.is_temp is False
 
     # ensure DB content was copied
     with sqlite3.connect(dest_path) as conn:
@@ -185,51 +200,51 @@ def test_save_as_db_flushes_engine(tmp_path):
     src_path = tmp_path / "src.db"
     dest_path = tmp_path / "dest2.db"
 
-    lib = Library.create(name="TestLib", path=src_path)
+    loaded_library = Library.create(name="TestLib", path=src_path)
 
     with sqlite3.connect(src_path) as conn:
         conn.execute("CREATE TABLE test (id INTEGER)")
         conn.commit()
 
     # open a SQLAlchemy connection to ensure engine exists
-    with lib.engine.connect() as conn:
+    with loaded_library.engine.connect() as conn:
         conn.exec_driver_sql("SELECT 1")
 
-    lib.save_as_db(dest_path)
+    loaded_library.save_as_db(dest_path)
 
     assert dest_path.exists()
 
 
 def test_load_from_db_returns_library(saved_library):
-    lib = Library.load_from_db(saved_library)
-    assert isinstance(lib, Library)
+    loaded_library = Library.load_from_db(saved_library)
+    assert isinstance(loaded_library, Library)
 
 
 def test_load_from_db_is_not_temp(saved_library):
-    lib = Library.load_from_db(saved_library)
-    assert lib.is_temp is False
+    loaded_library = Library.load_from_db(saved_library)
+    assert loaded_library.is_temp is False
 
 
 def test_load_from_db_counts(saved_library):
-    lib = Library.load_from_db(saved_library)
-    assert lib.n_compounds == 3
-    assert lib.n_spectra == 3
+    loaded_library = Library.load_from_db(saved_library)
+    assert loaded_library.n_compounds == 3
+    assert loaded_library.n_spectra == 3
 
 
 def test_load_from_db_name(saved_library):
-    lib = Library.load_from_db(saved_library)
-    assert lib.name == "In-memory MSP Library"
+    loaded_library = Library.load_from_db(saved_library)
+    assert loaded_library.name == "In-memory MSP Library"
 
 
 def test_load_from_db_path(saved_library):
-    lib = Library.load_from_db(saved_library)
-    assert lib.path == saved_library
+    loaded_library = Library.load_from_db(saved_library)
+    assert loaded_library.path == saved_library
 
 
 def test_load_from_db_empty_library(empty_library):
-    lib = Library.load_from_db(empty_library)
-    assert lib.n_compounds == 0
-    assert lib.n_spectra == 0
+    loaded_library = Library.load_from_db(empty_library)
+    assert loaded_library.n_compounds == 0
+    assert loaded_library.n_spectra == 0
 
 
 def test_load_from_db_wrong_type_raises():
@@ -301,3 +316,129 @@ def test_rename_library_changes_name(loaded_library):
     # Reload library to check name persisted in DB
     reloaded = Library.load_from_db(loaded_library.path)
     assert reloaded.name == new_name
+
+
+def test_get_or_insert_creates_new_compound(loaded_library):
+    with loaded_library.session_scope() as session:
+        compound = loaded_library._get_or_insert_compound_by_inchikey(session, "aspirin", "C9H8O4", "UNIQUE-KEY-001")
+        session.flush()
+        assert compound.id is not None
+
+
+def test_get_or_insert_compound_fields(loaded_library):
+    with loaded_library.session_scope() as session:
+        compound = loaded_library._get_or_insert_compound_by_inchikey(session, "aspirin", "C9H8O4", "UNIQUE-KEY-001")
+        assert compound.name == "aspirin"
+        assert compound.formula == "C9H8O4"
+        assert compound.inchikey == "UNIQUE-KEY-001"
+
+
+def test_get_or_insert_reuses_existing_compound(loaded_library):
+    with loaded_library.session_scope() as session:
+        c1 = loaded_library._get_or_insert_compound_by_inchikey(session, "aspirin", "C9H8O4", "UNIQUE-KEY-001")
+        session.flush()
+        c2 = loaded_library._get_or_insert_compound_by_inchikey(session, "aspirin", "C9H8O4", "UNIQUE-KEY-001")
+        assert c1.id == c2.id
+
+
+def test_get_or_insert_calculates_exact_mass(loaded_library):
+    with loaded_library.session_scope() as session:
+        compound = loaded_library._get_or_insert_compound_by_inchikey(session, "benzene", "C6H6", "UNIQUE-KEY-002")
+        assert compound.exact_mass == pytest.approx(78.04695, abs=1e-4)
+
+
+def test_get_or_insert_none_inchikey_raises(loaded_library):
+    with loaded_library.session_scope() as session:
+        with pytest.raises(ValueError, match="inchikey"):
+            loaded_library._get_or_insert_compound_by_inchikey(session, "unknown", "C6H6", None)
+
+
+def test_get_or_insert_empty_inchikey_raises(loaded_library):
+    with loaded_library.session_scope() as session:
+        with pytest.raises(ValueError, match="inchikey"):
+            loaded_library._get_or_insert_compound_by_inchikey(session, "unknown", "C6H6", "")
+
+
+def test_get_or_insert_none_name_raises(loaded_library):
+    with loaded_library.session_scope() as session:
+        with pytest.raises(ValueError, match="name"):
+            loaded_library._get_or_insert_compound_by_inchikey(session, None, "C6H6", "SOME-KEY")
+
+
+def test_get_or_insert_empty_name_raises(loaded_library):
+    with loaded_library.session_scope() as session:
+        with pytest.raises(ValueError, match="name"):
+            loaded_library._get_or_insert_compound_by_inchikey(session, "", "C6H6", "SOME-KEY")
+
+
+def test_get_or_insert_none_formula_raises(loaded_library):
+    with loaded_library.session_scope() as session:
+        with pytest.raises(ValueError, match="formula"):
+            loaded_library._get_or_insert_compound_by_inchikey(session, "unknown", None, "SOME-KEY")
+
+
+def test_get_or_insert_empty_formula_raises(loaded_library):
+    with loaded_library.session_scope() as session:
+        with pytest.raises(ValueError, match="formula"):
+            loaded_library._get_or_insert_compound_by_inchikey(session, "unknown", "", "SOME-KEY")
+
+
+def test_add_spectra_creates_compound(loaded_library, adduct_id, spectra_info):
+    initial = loaded_library.n_compounds
+    loaded_library.add_spectra("aspirin", "C9H8O4", "BSYNRYMUTXBXSQ-UHFFFAOYSA-N", spectra_info, adduct_id)
+
+    with loaded_library.session_scope() as session:
+        assert session.query(Compound).count() == initial + 1
+
+
+def test_add_spectra_creates_spectrum(loaded_library, adduct_id, spectra_info):
+    initial = loaded_library.n_spectra
+    loaded_library.add_spectra("aspirin", "C9H8O4", "BSYNRYMUTXBXSQ-UHFFFAOYSA-N", spectra_info, adduct_id)
+
+    with loaded_library.session_scope() as session:
+        assert session.query(Spectrum).count() == initial + 1
+
+
+def test_add_spectra_compound_fields(loaded_library, adduct_id, spectra_info):
+    loaded_library.add_spectra("aspirin", "C9H8O4", "BSYNRYMUTXBXSQ-UHFFFAOYSA-N", spectra_info, adduct_id)
+
+    with loaded_library.session_scope() as session:
+        compound = session.query(Compound).filter_by(inchikey="BSYNRYMUTXBXSQ-UHFFFAOYSA-N").one()
+        assert compound.name == "aspirin"
+        assert compound.formula == "C9H8O4"
+
+
+def test_add_spectra_spectrum_fields(loaded_library, adduct_id, spectra_info):
+    loaded_library.add_spectra("aspirin", "C9H8O4", "BSYNRYMUTXBXSQ-UHFFFAOYSA-N", spectra_info, adduct_id)
+
+    with loaded_library.session_scope() as session:
+        spectrum = session.query(Spectrum).filter_by(precursor_mz=100.0).first()
+        assert spectrum.polarity == "POSITIVE"
+        assert spectrum.collision_energy == pytest.approx(20.0)
+
+
+def test_add_spectra_reuses_existing_compound(loaded_library, adduct_id, spectra_info):
+    loaded_library.add_spectra("aspirin", "C9H8O4", "BSYNRYMUTXBXSQ-UHFFFAOYSA-N", spectra_info, adduct_id)
+
+    with loaded_library.session_scope() as session:
+        count = session.query(Compound).filter_by(inchikey="BSYNRYMUTXBXSQ-UHFFFAOYSA-N").count()
+        assert count == 1
+
+
+# ---- error cases ----
+
+def test_add_spectra_none_adduct_id_raises(loaded_library, spectra_info):
+    with pytest.raises(ValueError, match="adduct_id must be an integer"):
+        loaded_library.add_spectra("aspirin", "C9H8O4", "BSYNRYMUTXBXSQ-UHFFFAOYSA-N", spectra_info, None)
+
+
+def test_add_spectra_none_adduct_does_not_create_compound(loaded_library, spectra_info):
+    initial_count = None
+    with loaded_library.session_scope() as session:
+        initial_count = session.query(Compound).count()
+
+    with pytest.raises(ValueError, match="adduct_id must be an integer"):
+        loaded_library.add_spectra("aspirin", "C9H8O4", "BSYNRYMUTXBXSQ-UHFFFAOYSA-N", spectra_info, None)
+
+    with loaded_library.session_scope() as session:
+        assert session.query(Compound).count() == initial_count
