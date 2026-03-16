@@ -25,8 +25,8 @@ class Library:
         self.name: str = name
         self.engine: Engine = create_engine(f"sqlite:///{self.path}", future=True)
         self.session_maker = sessionmaker(bind=self.engine, future=True)
-        self.n_compounds = 0
-        self.n_spectra = 0
+        self._n_compounds = 0
+        self._n_spectra = 0
 
         @event.listens_for(self.engine, "connect")
         def enable_sqlite_fk(dbapi_connection, connection_record):
@@ -131,8 +131,8 @@ class Library:
             reader = MSPReader(session)
             reader.import_file(msp_path)
 
-            lib.n_compounds = session.query(Compound).count()
-            lib.n_spectra = session.query(Spectrum).count()
+            lib._n_compounds = session.query(Compound).count()
+            lib._n_spectra = session.query(Spectrum).count()
 
         lib.is_temp = True
 
@@ -159,8 +159,8 @@ class Library:
         # Create instance
         lib = cls(name=name, path=Path(path))
         session = lib.session_maker()
-        lib.n_compounds = session.query(Compound).count()
-        lib.n_spectra = session.query(Spectrum).count()
+        lib._n_compounds = session.query(Compound).count()
+        lib._n_spectra = session.query(Spectrum).count()
         lib.is_temp = False
         return lib
     
@@ -191,7 +191,13 @@ class Library:
                 raise ValueError(f"Adduct with ID {adduct_id} not found")
             return adduct.delta_mass
 
-
+    @property
+    def n_compounds(self):
+        return self._n_compounds
+    
+    @property
+    def n_spectra(self):
+        return self._n_spectra
 
 
 
