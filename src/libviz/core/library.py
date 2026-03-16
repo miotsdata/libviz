@@ -12,6 +12,7 @@ from libviz.core.db.models import (
     Compound,
     Spectrum,
     LibraryMetadata,
+    AdductType,
     populate_adduct_types
 )
 
@@ -162,9 +163,19 @@ class Library:
         lib.n_spectra = session.query(Spectrum).count()
         lib.is_temp = False
         return lib
-
-
-    """
+    
+    # ---------- Setters ----------
+    def rename_library(self, new_name: str):
+        logger.debug("Renaming library from %s to %s", self.name, new_name)
+        with self.session_scope() as session:
+            meta = session.query(LibraryMetadata).first()
+            if meta is None:
+                raise ValueError("No metadata found in library")
+            meta.name = new_name
+            session.commit()
+        self.name = new_name
+    
+    # ---------- Getters ----------
 
     def get_adducts(self):
         with self.session_scope() as session:
@@ -180,6 +191,13 @@ class Library:
                 raise ValueError(f"Adduct with ID {adduct_id} not found")
             return adduct.delta_mass
 
+
+
+
+
+
+
+    """
 
     def add_spectra(self, compound_name: str, compound_formula: str, inchikey: str, spectra_info: dict, adduct_id: float):
         with self.session_scope() as session:
@@ -273,13 +291,5 @@ class Library:
             return compounds
 
 
-    def rename(self, new_name: str):
-        logger.debug("Renaming library from %s to %s", self.name, new_name)
-        with self.session_scope() as session:
-            meta = session.query(LibraryMetadata).first()
-            if meta is None:
-                raise ValueError("No metadata found in library")
-            meta.name = new_name
-            session.commit()
-            self.name = new_name
+
 """

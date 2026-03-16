@@ -56,6 +56,11 @@ def saved_library(tmp_path, monkeypatch) -> Path:
 
     return db_path
 
+@pytest.fixture
+def loaded_library(saved_library) -> Library:
+    """A Library instance loaded from the saved db, ready to query."""
+    return Library.load_from_db(saved_library)
+
 
 @pytest.fixture
 def empty_library(tmp_path, monkeypatch):
@@ -245,3 +250,54 @@ def test_load_from_db_no_metadata_raises(tmp_path):
 
     with pytest.raises(ValueError, match="No metadata found"):
         Library.load_from_db(db_path)
+
+
+def test_get_adducts_returns_list(loaded_library):
+    adducts = loaded_library.get_adducts()
+    assert isinstance(adducts, list)
+
+
+def test_get_adducts_returns_dicts(loaded_library):
+    adducts = loaded_library.get_adducts()
+    assert all(isinstance(a, dict) for a in adducts)
+
+
+def test_get_adducts_dict_keys(loaded_library):
+    adducts = loaded_library.get_adducts()
+    expected_keys = {"id", "formula", "charge", "delta_mass"}
+    assert all(expected_keys == a.keys() for a in adducts)
+
+
+def test_get_adducts_contains_mh_plus(loaded_library):
+    formulas = [a["formula"] for a in loaded_library.get_adducts()]
+    assert "[M+H]+" in formulas
+
+
+def test_get_adduct_delta_returns_float(loaded_library):
+    adduct_id = loaded_library.get_adducts()[0]["id"]
+    delta = loaded_library.get_adduct_delta(adduct_id)
+    assert isinstance(delta, float)
+
+
+def test_get_adduct_delta_correct_value(loaded_library):
+    adducts = loaded_library.get_adducts()
+    mh = next(a for a in adducts if a["formula"] == "[M+H]+")
+    delta = loaded_library.get_adduct_delta(mh["id"])
+    assert delta == pytest.approx(mh["delta_mass"])
+
+
+def test_get_adduct_delta_invalid_id_raises(loaded_library):
+    with pytest.raises(ValueError, match="not found"):
+        loaded_library.get_adduct_delta(99999)
+
+
+def test_rename_library_changes_name(loaded_library):
+    old_name = loaded_library.name
+    new_name = "RenamedLib"
+    loaded_library.rename_library(new_name)
+
+    assert loaded_library.name == new_name
+
+    # Reload library to check name persisted in DB
+    reloaded = Library.load_from_db(loaded_library.path)
+    assert reloaded.name == new_name
