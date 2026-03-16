@@ -36,14 +36,13 @@ class Library:
             cursor.close()
 
     @classmethod
-    def create(cls, path: str | Path, name: str):
-        if not isinstance(path, (str, Path)):
-            raise TypeError(f"Path should be either str or Path, found {type(path).__name__}")
-        
+    def create(cls, path: Path, name: str):
+        if not isinstance(path, Path):
+            raise TypeError(f"Path should be a Path object, found {type(path).__name__}")
+
         if path.exists():
             raise FileExistsError(f"Library already exists at path {str(path)}")
 
-        path = Path(path) if isinstance(path, str) else path
         lib = cls(name = name, path=path)
 
         # upgrade schema (creates tables if DB is new, applies migrations if existing)
@@ -82,11 +81,11 @@ class Library:
 
 
     # ---------- Saving ----------
-    def save_as_db(self, path: str | Path):
+    def save_as_db(self, path: Path):
         logger.debug("Saving library to %s", path)
 
-        if not isinstance(path, (str, Path)):
-            raise TypeError(f"Path should be either str or Path, found {type(path).__name__}")
+        if not isinstance(path, Path):
+            raise TypeError(f"Path should be a Path object, found {type(path).__name__}")
 
         if self.name == "NONAME":
             raise ValueError("Name cannot be NONAME. Please rename the library with the rename method.")
@@ -118,11 +117,11 @@ class Library:
 
         tmp_file = tempfile.NamedTemporaryFile(
             suffix=".db",
-            delete=False
+            delete=True
         )
         tmp_file.close()
 
-        db_path = tmp_file.name
+        db_path = Path(tmp_file.name)
 
         lib = cls.create(name="In-memory MSP Library", path=db_path)
 
@@ -138,11 +137,11 @@ class Library:
 
         return lib
 
-"""
+
     @classmethod
-    def load_from_db(cls, path: str | Path):
-        if not isinstance(path, (str, Path)):
-            raise TypeError(f"Path should be either str or Path, found {type(path).__name__}")
+    def load_from_db(cls, path: Path):
+        if not isinstance(path, Path):
+            raise TypeError(f"Path should be a Path object, found {type(path).__name__}")
 
         if not Path(path).exists():
             raise FileNotFoundError(path)
@@ -165,9 +164,7 @@ class Library:
         return lib
 
 
-    
-
-    
+    """
 
     def get_adducts(self):
         with self.session_scope() as session:

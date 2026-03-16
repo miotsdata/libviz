@@ -1,12 +1,74 @@
 import pytest
-from pathlib import Path
 from unittest.mock import patch, MagicMock
+from libviz.core.db.extensions import Base
 from libviz.core.library import Library
 from libviz.core.db.models import LibraryMetadata
-from sqlalchemy import inspect
+from sqlalchemy import create_engine, inspect
 import sqlite3
+from pathlib import Path
 
 
+# ---- fixtures ----
+
+@pytest.fixture
+def saved_library(tmp_path, monkeypatch) -> Path:
+    """A real on-disk library with two compounds/spectra."""
+
+    fake_entries = [
+        {
+            "NAME": "cmpd1",
+            "FORMULA": "C6H6",
+            "INCHIKEY": "K1",
+            "PRECURSORTYPE": "[M+H]+",
+            "PRECURSORMZ": "79",
+            "IONMODE": "POSITIVE",
+            "COLLISIONENERGY": "20",
+            "peaks": [(50, 10)]
+        },
+        {
+            "NAME": "cmpd2",
+            "FORMULA": "C7H8",
+            "INCHIKEY": "K2",
+            "PRECURSORTYPE": "[M+H]+",
+            "PRECURSORMZ": "93",
+            "IONMODE": "POSITIVE",
+            "COLLISIONENERGY": "20",
+            "peaks": [(60, 5)]
+        },
+        {
+            "NAME": "cmpd3",
+            "FORMULA": "C7H81",
+            "INCHIKEY": "K22",
+            "PRECURSORTYPE": "[M+H]+",
+            "PRECURSORMZ": "93",
+            "IONMODE": "POSITIVE",
+            "COLLISIONENERGY": "20",
+            "peaks": [(60, 5)]
+        }
+
+    ]
+
+    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: fake_entries)
+
+    lib = Library.loadFromMSP(Path("dummy.msp"))
+    db_path = Path(tmp_path / "test.db")
+    lib.save_as_db(db_path)
+
+    return db_path
+
+
+@pytest.fixture
+def empty_library(tmp_path, monkeypatch):
+    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: [])
+
+    db_path = tmp_path / "empty.db"
+    lib = Library.loadFromMSP(Path("dummy.msp"))
+    lib.save_as_db(db_path)
+
+    return db_path
+
+
+# ---- TESTS ----
 def test_library_init(tmp_path):
     lib_path = tmp_path / "test.db"
     lib = Library(name="TestLib", path=lib_path)
@@ -131,3 +193,55 @@ def test_save_as_db_flushes_engine(tmp_path):
     lib.save_as_db(dest_path)
 
     assert dest_path.exists()
+
+
+def test_load_from_db_returns_library(saved_library):
+    lib = Library.load_from_db(saved_library)
+    assert isinstance(lib, Library)
+
+
+def test_load_from_db_is_not_temp(saved_library):
+    lib = Library.load_from_db(saved_library)
+    assert lib.is_temp is False
+
+
+def test_load_from_db_counts(saved_library):
+    lib = Library.load_from_db(saved_library)
+    assert lib.n_compounds == 3
+    assert lib.n_spectra == 3
+
+
+def test_load_from_db_name(saved_library):
+    lib = Library.load_from_db(saved_library)
+    assert lib.name == "In-memory MSP Library"
+
+
+def test_load_from_db_path(saved_library):
+    lib = Library.load_from_db(saved_library)
+    assert lib.path == saved_library
+
+
+def test_load_from_db_empty_library(empty_library):
+    lib = Library.load_from_db(empty_library)
+    assert lib.n_compounds == 0
+    assert lib.n_spectra == 0
+
+
+def test_load_from_db_wrong_type_raises():
+    with pytest.raises(TypeError):
+        Library.load_from_db(123)
+
+
+def test_load_from_db_missing_file_raises(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        Library.load_from_db(tmp_path / "nonexistent.db")
+
+
+def test_load_from_db_no_metadata_raises(tmp_path):
+    # A valid SQLite file but with no LibraryMetadata row
+    db_path = tmp_path / "bare.db"
+    engine = create_engine(f"sqlite:///{db_path}", future=True)
+    Base.metadata.create_all(engine)  # creates tables but inserts nothing
+
+    with pytest.raises(ValueError, match="No metadata found"):
+        Library.load_from_db(db_path)

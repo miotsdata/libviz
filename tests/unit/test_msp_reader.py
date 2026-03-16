@@ -251,10 +251,21 @@ def test_import_file(session):
             "IONMODE": "POSITIVE",
             "COLLISIONENERGY": "20",
             "peaks": [(60, 5)]
+        },
+        {
+            "NAME": "cmpd3",
+            "FORMULA": "C7H81",
+            "INCHIKEY": "K22",
+            "PRECURSORTYPE": "[M+H]+",
+            "PRECURSORMZ": "93",
+            "IONMODE": "POSITIVE",
+            "COLLISIONENERGY": "20",
+            "peaks": [(60, 5)]
         }
+
     ]
 
     with patch("libviz.core.readers.msp_reader.parse_msp", return_value=fake_entries):
         reader.import_file("dummy.msp")
 
-    assert session.query(Compound).count() == 2
+    assert session.query(Compound).count() == 3
