@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 import numpy as np
 
 from sqlalchemy.orm import Session
@@ -40,7 +41,10 @@ class MSPReader:
         self.compound_cache = {}
 
     # ---------- public API ----------
-    def import_file(self, msp_path: str):
+    def import_file(self, msp_path: Path):
+
+        if not isinstance(msp_path, Path):
+            raise TypeError(f"Msp_path should be a Path object. Found {type(msp_path).__name__}")
 
         for entry in parse_msp(msp_path):
             self._insert_entry(entry)

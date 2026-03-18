@@ -1,4 +1,7 @@
-def parse_msp(file_path):
+from pathlib import Path
+
+
+def parse_msp(file_path: Path):
     with open(file_path, "r", encoding="utf-8") as f:
         entry_lines = []
 

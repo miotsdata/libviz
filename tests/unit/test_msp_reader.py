@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from libviz.core.readers.msp_reader import MSPReader
 from libviz.core.db.models import AdductType, Compound, Spectrum, SpectrumMetadata
 from unittest.mock import patch
@@ -266,7 +268,7 @@ def test_import_file(session):
     ]
 
     with patch("libviz.core.readers.msp_reader.parse_msp", return_value=fake_entries):
-        reader.import_file("dummy.msp")
+        reader.import_file(Path("dummy.msp"))
 
     assert session.query(Compound).count() == 3
 

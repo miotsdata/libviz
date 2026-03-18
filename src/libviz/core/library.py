@@ -21,6 +21,17 @@ logger = logging.getLogger(__name__)
 
 class Library:
     def __init__(self, name: str, path: Path):
+
+        # Checks
+        if not isinstance(path, (str, Path)):
+            raise TypeError(f"Path should be a Path object or str, found {type(path).__name__}")
+        
+        if not isinstance(name, str):
+            raise TypeError(f"Name should be of type str, found {type(name).__name__}")
+        
+        if not name:
+            raise ValueError("Name cannot be an empty string.")
+        
         self.path: Path = path
         self.is_temp: bool = True
         self.name: str = name
@@ -39,13 +50,11 @@ class Library:
 
     @classmethod
     def create(cls, path: Path, name: str):
-        if not isinstance(path, Path):
-            raise TypeError(f"Path should be a Path object, found {type(path).__name__}")
+
+        lib = cls(name = name, path=path)
 
         if path.exists():
             raise FileExistsError(f"Library already exists at path {str(path)}")
-
-        lib = cls(name = name, path=path)
 
         # upgrade schema (creates tables if DB is new, applies migrations if existing)
         upgrade_library_schema(lib.path)
@@ -115,7 +124,7 @@ class Library:
 
     # ---------- Loading ----------
     @classmethod
-    def loadFromMSP(cls, msp_path: str):
+    def loadFromMSP(cls, msp_path: Path):
 
         tmp_file = tempfile.NamedTemporaryFile(
             suffix=".db",
