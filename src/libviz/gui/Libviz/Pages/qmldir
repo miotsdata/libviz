@@ -1,0 +1,3 @@
+module Libviz.Pages
+
+WelcomePage 1.0 WelcomePage.qml

@@ -4,6 +4,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 
+import Libviz.Pages 1.0
+
 ApplicationWindow {
     id: window
     visible: true
@@ -68,36 +70,9 @@ ApplicationWindow {
     StackView {
         id: stack
         anchors.fill: parent
-        initialItem: welcomePage
+        initialItem: WelcomePage {}
     }
 
-    // Inline welcome page — will be replaced by HomePage.qml
-    // when navigation is wired up
-    Component {
-        id: welcomePage
-
-        Item {
-            Column {
-                anchors.centerIn: parent
-                spacing: 16
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "LibViz"
-                    font.pixelSize: 48
-                    font.weight: Font.Light
-                    color: "#1a1a1a"
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "Open or create a library to get started"
-                    font.pixelSize: 14
-                    color: "#888888"
-                }
-            }
-        }
-    }
 
     // =========================
     // STATUS BAR
