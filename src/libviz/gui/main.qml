@@ -33,7 +33,7 @@ ApplicationWindow {
 
             MenuItem {
                 text: qsTr("Load from .msp…")
-                onTriggered: { /* TODO */ }
+                onTriggered: mspFileDialog.open()
             }
 
             MenuItem {
@@ -80,7 +80,7 @@ ApplicationWindow {
 
     footer: ToolBar {
         id: statusBar
-        visible: false
+        visible: statusText.text !== ""
         height: visible ? implicitHeight : 0
 
         RowLayout {
@@ -100,10 +100,42 @@ ApplicationWindow {
 
             BusyIndicator {
                 id: busyIndicator
-                running: statusBar.visible
+                running: statusText.text !== ""
                 width: 20
                 height: 20
             }
         }
+    }
+
+    Connections {
+        target: libraryManager
+
+        function onStatusChanged(message) {
+            statusText.text = message
+        }
+
+        function onErrorOccurred(message) {
+            errorDialog.errorText = message
+            errorDialog.open()
+        }
+
+        function onLibraryLoaded(path) {
+            print("Library loaded:", path)
+        }
+    }
+
+    Dialog {
+        id: errorDialog
+        property alias errorText: errorLabel.text
+        title: "Error"
+        Label { id: errorLabel }
+        standardButtons: Dialog.Ok
+    }
+
+    FileDialog {
+        id: mspFileDialog
+        title: qsTr("Select .msp file")
+        nameFilters: ["MSP files (*.msp)", "All files (*)"]
+        onAccepted: libraryManager.loadLibraryFromMsp(selectedFile)
     }
 }

@@ -25,13 +25,13 @@ class Library:
         # Checks
         if not isinstance(path, (str, Path)):
             raise TypeError(f"Path should be a Path object or str, found {type(path).__name__}")
-        
+
         if not isinstance(name, str):
             raise TypeError(f"Name should be of type str, found {type(name).__name__}")
-        
+
         if not name:
             raise ValueError("Name cannot be an empty string.")
-        
+
         self.path: Path = path
         self.is_temp: bool = True
         self.name: str = name
@@ -50,6 +50,8 @@ class Library:
 
     @classmethod
     def create(cls, path: Path, name: str):
+
+        logger.debug("Creating new library with name %s at path %s", name, path)
 
         lib = cls(name = name, path=path)
 
@@ -126,6 +128,8 @@ class Library:
     @classmethod
     def loadFromMSP(cls, msp_path: Path):
 
+        logger.debug("Loading library from MSP file %s", msp_path)
+
         tmp_file = tempfile.NamedTemporaryFile(
             suffix=".db",
             delete=True
@@ -145,6 +149,8 @@ class Library:
             lib._n_spectra = session.query(Spectrum).count()
 
         lib.is_temp = True
+
+        logger.debug("Loaded library from MSP file %s with %d compounds and %d spectra", msp_path, lib._n_compounds, lib._n_spectra)
 
         return lib
 

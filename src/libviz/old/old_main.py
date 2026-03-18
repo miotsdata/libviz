@@ -13,7 +13,7 @@ from libviz.utils import configure_logging
 from libviz.backends import CreateLibraryBackend, LoadLibraryBackend, LoadMzmlBackend, AddSpectraBackend
 from libviz.services import LibraryService
 
-import libviz.resources_rc
+import libviz.old.resources_rc
 
 def main():
     configure_logging()

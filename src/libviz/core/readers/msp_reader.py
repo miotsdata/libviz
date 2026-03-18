@@ -19,7 +19,7 @@ from libviz.core.utils import (
     infer_precursor_delta
 )
 
-logger = logging.getLogger(__name__)
+
 
 POLARITY_MAP = {
     "positive": "POSITIVE",
@@ -29,6 +29,8 @@ POLARITY_MAP = {
     "neg": "NEGATIVE",
     "n": "NEGATIVE",
 }
+
+logger = logging.getLogger(__name__)
 
 class MSPReader:
 
@@ -42,6 +44,8 @@ class MSPReader:
 
     # ---------- public API ----------
     def import_file(self, msp_path: Path):
+
+        logger.debug("Starting import of MSP file: %s", msp_path)
 
         if not isinstance(msp_path, Path):
             raise TypeError(f"Msp_path should be a Path object. Found {type(msp_path).__name__}")
