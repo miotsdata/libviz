@@ -108,7 +108,7 @@ ApplicationWindow {
     }
 
     Connections {
-        target: libraryManager
+        target: libraryManagerBridge
 
         function onStatusChanged(message) {
             statusText.text = message
@@ -120,7 +120,9 @@ ApplicationWindow {
         }
 
         function onLibraryLoaded(path) {
-            print("Library loaded:", path)
+            var component = Qt.createComponent("qrc:/gui/Libviz/Pages/LibraryHomePage.qml")
+            stack.clear()
+            stack.push(component)
         }
     }
 
@@ -136,6 +138,6 @@ ApplicationWindow {
         id: mspFileDialog
         title: qsTr("Select .msp file")
         nameFilters: ["MSP files (*.msp)", "All files (*)"]
-        onAccepted: libraryManager.loadLibraryFromMsp(selectedFile)
+        onAccepted: libraryManagerBridge.loadLibraryFromMsp(selectedFile)
     }
 }

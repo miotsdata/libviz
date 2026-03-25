@@ -3,5 +3,6 @@
         <file>main.qml</file>
         <file>Libviz/Pages/WelcomePage.qml</file>
         <file>Libviz/Pages/qmldir</file>
+        <file>Libviz/Pages/LibraryHomePage.qml</file>
     </qresource>
 </RCC>

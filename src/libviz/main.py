@@ -27,7 +27,7 @@ def main():
     
 
     engine = QQmlApplicationEngine()
-    engine.rootContext().setContextProperty("libraryManager", bridge)
+    engine.rootContext().setContextProperty("libraryManagerBridge", bridge)
 
     # qml/ is mounted at qrc:/qml — add it as import path for qmldir modules
     engine.addImportPath("qrc:/gui")
