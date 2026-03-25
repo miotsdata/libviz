@@ -127,8 +127,67 @@ def unique_spectrum(loaded_library, adduct_id) -> int:
     )
     with loaded_library.session_scope() as session:
         return session.query(Spectrum).filter_by(precursor_mz=200.0).one().id
+    
 
-# ---- TESTS ----
+@pytest.fixture
+def known_spectrum(loaded_library, adduct_id) -> dict:
+    """
+    Inserts one spectrum and returns the raw values needed to call
+    get_identical_spectra_compounds_by_spectrum_info.
+    """
+    mz = np.array([55.0, 77.0], dtype=np.float32)
+    intensity = np.array([200.0, 100.0], dtype=np.float32)
+    loaded_library.add_spectra(
+        "known_cmpd", "C6H6", "INCHI-KNOWN",
+        _spectra_info(150.0, mz, intensity),
+        adduct_id,
+    )
+    with loaded_library.session_scope() as session:
+        s = session.query(Spectrum).filter_by(precursor_mz=150.0).one()
+        return {
+            "precursor_mz": s.precursor_mz,
+            "polarity": s.polarity,
+            "hash": s.spectrum_hash,
+            "spectrum_id": s.id,
+            "compound_name": "known_cmpd",
+        }
+
+
+@pytest.fixture
+def two_info_spectra(loaded_library, adduct_id) -> dict:
+    """
+    Two compounds with identical peaks and precursor_mz — both should appear
+    in results when queried by either one's spectrum info.
+    """
+    mz = np.array([40.0, 80.0], dtype=np.float32)
+    intensity = np.array([300.0, 150.0], dtype=np.float32)
+    loaded_library.add_spectra(
+        "alpha", "C2H6O", "INCHI-ALPHA",
+        _spectra_info(120.0, mz, intensity),
+        adduct_id,
+    )
+    loaded_library.add_spectra(
+        "beta", "C3H8O", "INCHI-BETA",
+        _spectra_info(120.0, mz, intensity),
+        adduct_id,
+    )
+    with loaded_library.session_scope() as session:
+        s = session.query(Spectrum).filter_by(precursor_mz=120.0).first()
+        return {
+            "precursor_mz": s.precursor_mz,
+            "polarity": s.polarity,
+            "hash": s.spectrum_hash,
+        }
+
+
+
+
+# --------------------------------------------
+#
+# TESTS
+#
+# --------------------------------------------
+
 def test_library_init(tmp_path):
     lib_path = tmp_path / "test.db"
     loaded_library = Library(name="TestLib", path=lib_path)
@@ -503,48 +562,48 @@ def test_get_compound_id_invalid_id_raises(loaded_library):
         loaded_library.get_compound_id_from_spectrum_id(99999)
 
 
-def test_get_identical_spectra_compounds_returns_list(loaded_library, two_identical_spectra):
-    result = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
+def test_get_identical_spectra_compounds_by_spectrum_id_returns_list(loaded_library, two_identical_spectra):
+    result = loaded_library.get_identical_spectra_compounds_by_spectrum_id(two_identical_spectra["s1_id"])
     assert isinstance(result, list)
 
 
-def test_get_identical_spectra_compounds_finds_match(loaded_library, two_identical_spectra):
-    result = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
+def test_get_identical_spectra_compounds_by_spectrum_id_finds_match(loaded_library, two_identical_spectra):
+    result = loaded_library.get_identical_spectra_compounds_by_spectrum_id(two_identical_spectra["s1_id"])
     assert len(result) == 1
 
 
-def test_get_identical_spectra_compounds_dict_keys(loaded_library, two_identical_spectra):
-    result = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
-    assert set(result[0].keys()) == {"id", "name", "formula"}
+def test_get_identical_spectra_compounds_by_spectrum_id_dict_keys(loaded_library, two_identical_spectra):
+    result = loaded_library.get_identical_spectra_compounds_by_spectrum_id(two_identical_spectra["s1_id"])
+    assert set(result[0].keys()) == {"id", "name", "formula", "inchikey", "spectrum_id"}
 
 
-def test_get_identical_spectra_compounds_correct_compound(loaded_library, two_identical_spectra):
-    result = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
+def test_get_identical_spectra_compounds_by_spectrum_id_correct_compound(loaded_library, two_identical_spectra):
+    result = loaded_library.get_identical_spectra_compounds_by_spectrum_id(two_identical_spectra["s1_id"])
     names = [c["name"] for c in result]
     assert "ibuprofen" in names
 
 
-def test_get_identical_spectra_compounds_excludes_self(loaded_library, two_identical_spectra):
+def test_get_identical_spectra_compounds_by_spectrum_id_excludes_self(loaded_library, two_identical_spectra):
     s1_compound_id = loaded_library.get_compound_id_from_spectrum_id(two_identical_spectra["s1_id"])
-    result = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
+    result = loaded_library.get_identical_spectra_compounds_by_spectrum_id(two_identical_spectra["s1_id"])
     compound_ids = [c["id"] for c in result]
     assert s1_compound_id not in compound_ids
 
 
-def test_get_identical_spectra_compounds_no_match(loaded_library, unique_spectrum):
-    result = loaded_library.get_identical_spectra_compounds(unique_spectrum)
+def test_get_identical_spectra_compounds_by_spectrum_id_no_match(loaded_library, unique_spectrum):
+    result = loaded_library.get_identical_spectra_compounds_by_spectrum_id(unique_spectrum)
     assert result == []
 
 
-def test_get_identical_spectra_compounds_invalid_id_raises(loaded_library):
+def test_get_identical_spectra_compounds_by_spectrum_id_invalid_id_raises(loaded_library):
     with pytest.raises(ValueError, match="not found"):
-        loaded_library.get_identical_spectra_compounds(99999)
+        loaded_library.get_identical_spectra_compounds_by_spectrum_id(99999)
 
 
-def test_get_identical_spectra_compounds_symmetry(loaded_library, two_identical_spectra):
+def test_get_identical_spectra_compounds_by_spectrum_id_symmetry(loaded_library, two_identical_spectra):
     """If s1 matches s2, then s2 should also match s1."""
-    from_s1 = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s1_id"])
-    from_s2 = loaded_library.get_identical_spectra_compounds(two_identical_spectra["s2_id"])
+    from_s1 = loaded_library.get_identical_spectra_compounds_by_spectrum_id(two_identical_spectra["s1_id"])
+    from_s2 = loaded_library.get_identical_spectra_compounds_by_spectrum_id(two_identical_spectra["s2_id"])
 
     ids_from_s1 = {c["id"] for c in from_s1}
     ids_from_s2 = {c["id"] for c in from_s2}
@@ -554,3 +613,155 @@ def test_get_identical_spectra_compounds_symmetry(loaded_library, two_identical_
 
     assert s2_compound in ids_from_s1
     assert s1_compound in ids_from_s2
+
+
+
+# ---- get_identical_spectra_compounds_by_spectrum_info ----
+
+class TestGetIdenticalSpectraCompoundsBySpectrumInfo:
+
+    # --- return type / shape ---
+
+    def test_returns_list(self, loaded_library, known_spectrum):
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            known_spectrum["precursor_mz"],
+            known_spectrum["polarity"],
+            known_spectrum["hash"],
+        )
+        assert isinstance(result, list)
+
+    def test_result_items_are_dicts(self, loaded_library, known_spectrum):
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            known_spectrum["precursor_mz"],
+            known_spectrum["polarity"],
+            known_spectrum["hash"],
+        )
+        assert all(isinstance(item, dict) for item in result)
+
+    def test_dict_keys(self, loaded_library, known_spectrum):
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            known_spectrum["precursor_mz"],
+            known_spectrum["polarity"],
+            known_spectrum["hash"],
+        )
+        assert set(result[0].keys()) == {"id", "name", "formula", "inchikey", "spectrum_id"}
+
+    # --- correct content ---
+
+    def test_finds_matching_compound(self, loaded_library, known_spectrum):
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            known_spectrum["precursor_mz"],
+            known_spectrum["polarity"],
+            known_spectrum["hash"],
+        )
+        assert any(c["name"] == known_spectrum["compound_name"] for c in result)
+
+    def test_returns_both_when_two_identical(self, loaded_library, two_info_spectra):
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            two_info_spectra["precursor_mz"],
+            two_info_spectra["polarity"],
+            two_info_spectra["hash"],
+        )
+        names = {c["name"] for c in result}
+        assert {"alpha", "beta"} == names
+
+    def test_compound_fields_are_correct(self, loaded_library, known_spectrum):
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            known_spectrum["precursor_mz"],
+            known_spectrum["polarity"],
+            known_spectrum["hash"],
+        )
+        hit = next(c for c in result if c["name"] == known_spectrum["compound_name"])
+        assert hit["formula"] == "C6H6"
+        assert hit["inchikey"] == "INCHI-KNOWN"
+        assert isinstance(hit["spectrum_id"], int)
+
+    def test_includes_self(self, loaded_library, known_spectrum):
+        """Unlike get_by_spectrum_id, this method has no self-exclusion."""
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            known_spectrum["precursor_mz"],
+            known_spectrum["polarity"],
+            known_spectrum["hash"],
+        )
+        spectrum_ids = [c["spectrum_id"] for c in result]
+        assert known_spectrum["spectrum_id"] in spectrum_ids
+
+    # --- no match → empty list (not ValueError) ---
+
+    def test_wrong_hash_returns_empty(self, loaded_library, known_spectrum):
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            known_spectrum["precursor_mz"],
+            known_spectrum["polarity"],
+            "NONEXISTENT-HASH",
+        )
+        assert result == []
+
+    def test_wrong_polarity_returns_empty(self, loaded_library, known_spectrum):
+        wrong_polarity = "NEGATIVE" if known_spectrum["polarity"] == "POSITIVE" else "POSITIVE"
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            known_spectrum["precursor_mz"],
+            wrong_polarity,
+            known_spectrum["hash"],
+        )
+        assert result == []
+
+    def test_precursor_mz_outside_ppm_window_returns_empty(self, loaded_library, known_spectrum):
+        """Same hash/polarity but precursor_mz far enough away to fail the ppm filter."""
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            known_spectrum["precursor_mz"] * 1.1,  # 10% shift — well outside 5 ppm
+            known_spectrum["polarity"],
+            known_spectrum["hash"],
+        )
+        assert result == []
+
+    # --- ppm tolerance boundary ---
+
+    def test_zero_ppm_tolerance_matches_exact_mz(self, loaded_library, known_spectrum):
+        result = loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+            known_spectrum["precursor_mz"],
+            known_spectrum["polarity"],
+            known_spectrum["hash"],
+            ppm_tolerance=0.0,
+        )
+        assert any(c["name"] == known_spectrum["compound_name"] for c in result)
+
+    # --- input validation ---
+
+    def test_precursor_mz_zero_raises(self, loaded_library, known_spectrum):
+        with pytest.raises(ValueError, match="precursor_mz"):
+            loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+                0.0, known_spectrum["polarity"], known_spectrum["hash"]
+            )
+
+    def test_precursor_mz_negative_raises(self, loaded_library, known_spectrum):
+        with pytest.raises(ValueError, match="precursor_mz"):
+            loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+                -1.0, known_spectrum["polarity"], known_spectrum["hash"]
+            )
+
+    def test_invalid_polarity_raises(self, loaded_library, known_spectrum):
+        with pytest.raises(ValueError, match="polarity"):
+            loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+                known_spectrum["precursor_mz"], "INVALID", known_spectrum["hash"]
+            )
+
+    def test_empty_hash_raises(self, loaded_library, known_spectrum):
+        with pytest.raises(ValueError, match="hash_ref"):
+            loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+                known_spectrum["precursor_mz"], known_spectrum["polarity"], ""
+            )
+
+    def test_none_hash_raises(self, loaded_library, known_spectrum):
+        with pytest.raises(ValueError, match="hash_ref"):
+            loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+                known_spectrum["precursor_mz"], known_spectrum["polarity"], None
+            )
+
+    def test_negative_ppm_tolerance_raises(self, loaded_library, known_spectrum):
+        with pytest.raises(ValueError, match="ppm_tolerance"):
+            loaded_library.get_identical_spectra_compounds_by_spectrum_info(
+                known_spectrum["precursor_mz"],
+                known_spectrum["polarity"],
+                known_spectrum["hash"],
+                ppm_tolerance=-1.0,
+            )

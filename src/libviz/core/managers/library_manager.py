@@ -56,3 +56,10 @@ class LibraryManager:
     @property
     def library_count(self):
         return len(self._libraries)
+
+
+    def get_identical_spectra(self, spectrum):
+        """Return list of spectra that are identical to the given spectrum."""
+        if self.selected_library() is None:
+            return []
+        return self.selected_library().get_identical_spectra(spectrum)

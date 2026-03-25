@@ -263,8 +263,6 @@ class Library:
             raise ValueError("adduct_id must be an integer")
 
         # Get or insert compound
-        
-
         with self.session_scope() as session:
             compound = self._get_or_insert_compound_by_inchikey(session,
                                                                 compound_name,
@@ -287,13 +285,13 @@ class Library:
                                ppm_tolerance: float = 5):
         if precursor_mz <= 0:
             raise ValueError("precursor_mz must be a positive number")
-        
-        if polarity not in ("positive", "negative"):
-            raise ValueError("polarity must be either 'positive' or 'negative'")
-        
+
+        if polarity not in ("POSITIVE", "NEGATIVE"):
+            raise ValueError("polarity must be either 'POSITIVE' or 'NEGATIVE'")
+
         if not isinstance(hash_ref, str) or not hash_ref:
             raise ValueError("hash_ref must be a non-empty string")
-        
+
         if ppm_tolerance < 0:
             raise ValueError("ppm_tolerance must be a non-negative number")
 
@@ -320,14 +318,16 @@ class Library:
             return spectrum.compound_id
 
 
-    def get_identical_spectra_compounds(self, spectrum_id: int, ppm_tolerance: float = 5):
+    def get_identical_spectra_compounds_by_spectrum_id(self,
+                                                       spectrum_id: int,
+                                                       ppm_tolerance: float = 5):
 
         if not isinstance(spectrum_id, int):
             raise ValueError("spectrum_id must be an integer")
-        
+
         if not isinstance(ppm_tolerance, (int, float)):
             raise ValueError("ppm_tolerance must be a number")
-        
+
         if ppm_tolerance < 0:
             raise ValueError("ppm_tolerance must be a non-negative number")
 
@@ -351,6 +351,47 @@ class Library:
             for candidate_spectrum, comp in candidates:
                 ppm_diff = abs(candidate_spectrum.precursor_mz - spectrum.precursor_mz) / spectrum.precursor_mz * 1e6
                 if ppm_diff <= ppm_tolerance:
-                    compounds.append({"id": comp.id, "name": comp.name, "formula": comp.formula})
+                    compounds.append({"id": comp.id,
+                                      "name": comp.name,
+                                      "formula": comp.formula, 
+                                      "inchikey": comp.inchikey, 
+                                      "spectrum_id": candidate_spectrum.id})
 
             return compounds
+
+
+    def get_identical_spectra_compounds_by_spectrum_info(self,
+                                                         precursor_mz: float,
+                                                         polarity: str,
+                                                         hash_ref: str,
+                                                         ppm_tolerance: float = 5) -> list[dict]:
+        if precursor_mz <= 0:
+            raise ValueError("precursor_mz must be a positive number")
+
+        if polarity not in ("POSITIVE", "NEGATIVE"):
+            raise ValueError("polarity must be either 'POSITIVE' or 'NEGATIVE'")
+
+        if not isinstance(hash_ref, str) or not hash_ref:
+            raise ValueError("hash_ref must be a non-empty string")
+
+        if ppm_tolerance < 0:
+            raise ValueError("ppm_tolerance must be a non-negative number")
+
+        with self.session_scope() as session:
+            spectrum = session.query(Spectrum).filter_by(
+                polarity=polarity,
+                spectrum_hash=hash_ref
+            ).all()
+
+            compounds = []
+            for candidate_spectrum in spectrum:
+                ppm_diff = abs(candidate_spectrum.precursor_mz - precursor_mz) / precursor_mz * 1e6
+                if ppm_diff <= ppm_tolerance:
+                    compounds.append({"id": candidate_spectrum.compound_id,
+                                      "name": candidate_spectrum.compound.name,
+                                      "formula": candidate_spectrum.compound.formula, 
+                                      "inchikey": candidate_spectrum.compound.inchikey, 
+                                      "spectrum_id": candidate_spectrum.id})
+
+            return compounds
+    
