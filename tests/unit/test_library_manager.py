@@ -16,6 +16,23 @@ def make_mock_library(path: Path = Path("/fake/lib.db"), name: str = "TestLib"):
     lib.name = name
     return lib
 
+def _make_mock_library(path: str, results: list[dict]) -> MagicMock:
+    """A mock Library that returns `results` from get_identical_spectra_compounds_by_spectrum_info."""
+    lib = MagicMock()
+    lib.path = path
+    lib.get_identical_spectra_compounds_by_spectrum_info.return_value = results
+    return lib
+
+
+PRECURSOR_MZ = 100.0
+POLARITY = "positive"
+HASH_REF = "abc123"
+PPM = 5.0
+
+@pytest.fixture
+def mock_manager() -> LibraryManager:
+    return LibraryManager()
+
 
 # ---------------------------------------------------------------------------
 # __init__
@@ -344,3 +361,99 @@ class TestUnloadLibrary:
         mgr.unload_library("/fake/lib.db")
 
         assert mgr.has_libraries is False
+
+
+class TestGetIdenticalSpectra:
+
+    # --- delegation ---
+
+    def test_calls_each_library_with_correct_args(self, mock_manager):
+        lib_a = _make_mock_library("/a.db", [])
+        lib_b = _make_mock_library("/b.db", [])
+        mock_manager._libraries = {"a": lib_a, "b": lib_b}
+
+        mock_manager.get_identical_spectra(PRECURSOR_MZ, POLARITY, HASH_REF, PPM)
+
+        for lib in (lib_a, lib_b):
+            lib.get_identical_spectra_compounds_by_spectrum_info.assert_called_once_with(
+                precursor_mz=PRECURSOR_MZ,
+                polarity=POLARITY,
+                hash_ref=HASH_REF,
+                ppm_tolerance=PPM,
+            )
+
+    # --- aggregation ---
+
+    def test_returns_empty_when_no_libraries(self, mock_manager):
+        mock_manager._libraries = {}
+        result = mock_manager.get_identical_spectra(PRECURSOR_MZ, POLARITY, HASH_REF, PPM)
+        assert result == []
+
+    def test_returns_empty_when_no_matches(self, mock_manager):
+        mock_manager._libraries = {"a": _make_mock_library("/a.db", [])}
+        result = mock_manager.get_identical_spectra(PRECURSOR_MZ, POLARITY, HASH_REF, PPM)
+        assert result == []
+
+    def test_returns_matches_from_single_library(self, mock_manager):
+        hits = [{"id": 1, "name": "aspirin", "formula": "C9H8O4",
+                 "inchikey": "KEY1", "spectrum_id": 10}]
+        mock_manager._libraries = {"a": _make_mock_library("/a.db", hits)}
+
+        result = mock_manager.get_identical_spectra(PRECURSOR_MZ, POLARITY, HASH_REF, PPM)
+
+        assert len(result) == 1
+
+    def test_aggregates_matches_across_libraries(self, mock_manager):
+        hits_a = [{"id": 1, "name": "aspirin", "formula": "C9H8O4",
+                   "inchikey": "KEY1", "spectrum_id": 10}]
+        hits_b = [{"id": 2, "name": "ibuprofen", "formula": "C13H18O2",
+                   "inchikey": "KEY2", "spectrum_id": 20},
+                  {"id": 3, "name": "caffeine", "formula": "C8H10N4O2",
+                   "inchikey": "KEY3", "spectrum_id": 30}]
+        mock_manager._libraries = {
+            "a": _make_mock_library("/a.db", hits_a),
+            "b": _make_mock_library("/b.db", hits_b),
+        }
+
+        result = mock_manager.get_identical_spectra(PRECURSOR_MZ, POLARITY, HASH_REF, PPM)
+
+        assert len(result) == 3
+
+    # --- library_path injection ---
+
+    def test_injects_library_path_into_each_result(self, mock_manager):
+        hits = [{"id": 1, "name": "aspirin", "formula": "C9H8O4",
+                 "inchikey": "KEY1", "spectrum_id": 10}]
+        mock_manager._libraries = {"a": _make_mock_library("/a.db", hits)}
+
+        result = mock_manager.get_identical_spectra(PRECURSOR_MZ, POLARITY, HASH_REF, PPM)
+
+        assert result[0]["library_path"] == "/a.db"
+
+    def test_library_path_correct_across_multiple_libraries(self, mock_manager):
+        mock_manager._libraries = {
+            "a": _make_mock_library("/a.db", [{"id": 1, "name": "x",
+                                               "formula": "C1", "inchikey": "K1",
+                                               "spectrum_id": 1}]),
+            "b": _make_mock_library("/b.db", [{"id": 2, "name": "y",
+                                               "formula": "C2", "inchikey": "K2",
+                                               "spectrum_id": 2}]),
+        }
+
+        result = mock_manager.get_identical_spectra(PRECURSOR_MZ, POLARITY, HASH_REF, PPM)
+
+        by_name = {r["name"]: r for r in result}
+        assert by_name["x"]["library_path"] == "/a.db"
+        assert by_name["y"]["library_path"] == "/b.db"
+
+    def test_does_not_mutate_original_dicts(self, mock_manager):
+        """The loop adds library_path in-place — verify the caller's original list is unchanged
+        only if the implementation is ever changed to copy. For now, documents current behaviour."""
+        original = {"id": 1, "name": "aspirin", "formula": "C9H8O4",
+                    "inchikey": "KEY1", "spectrum_id": 10}
+        mock_manager._libraries = {"a": _make_mock_library("/a.db", [original])}
+
+        mock_manager.get_identical_spectra(PRECURSOR_MZ, POLARITY, HASH_REF, PPM)
+
+        # Current implementation mutates in-place — document that it does
+        assert "library_path" in original

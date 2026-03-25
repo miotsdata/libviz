@@ -394,4 +394,3 @@ class Library:
                                       "spectrum_id": candidate_spectrum.id})
 
             return compounds
-    

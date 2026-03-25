@@ -58,8 +58,21 @@ class LibraryManager:
         return len(self._libraries)
 
 
-    def get_identical_spectra(self, spectrum):
+    def get_identical_spectra(self, 
+                              precursor_mz: float, 
+                              polarity: str, 
+                              hash_ref: str, 
+                              ppm_tolerance: float) -> list[dict]:
         """Return list of spectra that are identical to the given spectrum."""
-        if self.selected_library() is None:
-            return []
-        return self.selected_library().get_identical_spectra(spectrum)
+        identical_spectra = []
+        for lib in self._libraries.values():
+            res: list[dict] = lib.get_identical_spectra_compounds_by_spectrum_info(
+                precursor_mz=precursor_mz,
+                polarity=polarity,
+                hash_ref=hash_ref,
+                ppm_tolerance=ppm_tolerance,
+            )
+            for r in res:
+                r['library_path'] = lib.path
+                identical_spectra.append(r)
+        return identical_spectra
