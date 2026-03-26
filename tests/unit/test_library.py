@@ -378,7 +378,7 @@ def test_get_adducts_returns_dicts(loaded_library):
 
 def test_get_adducts_dict_keys(loaded_library):
     adducts = loaded_library.get_adducts()
-    expected_keys = {"id", "formula", "charge", "delta_mass"}
+    expected_keys = {"id", "formula", "charge", "delta_mass", "multiplication_factor"}
     assert all(expected_keys == a.keys() for a in adducts)
 
 

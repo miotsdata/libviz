@@ -7,7 +7,7 @@ class SpectrumMetadata(Base):
     __tablename__ = "spectrum_metadata"
 
     id = Column(Integer, primary_key=True)
-    spectrum_id = Column(Integer, ForeignKey("spectrum.id"), nullable=False)
+    spectrum_id = Column(Integer, ForeignKey("spectrum.id"), nullable=False, index=True)
     key = Column(String, nullable=False, index=True)
     value = Column(String, nullable=False)
 

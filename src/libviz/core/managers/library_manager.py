@@ -18,13 +18,15 @@ class LibraryManager:
 
         lib = Library.loadFromMSP(msp_path)
         self._libraries[lib.path] = lib
+        self._selected_library = lib.path
 
     def load_library_from_db(self, path: str | Path):
         path = path if isinstance(path, Path) else Path(path)
 
         lib = Library.load_from_db(path)
         self._libraries[lib.path] = lib
-    
+        self._selected_library = lib.path
+
     def save_as_db(self, path: str | Path):
         path = path if isinstance(path, Path) else Path(path)
 

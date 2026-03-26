@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 import numpy as np
+import re
 
 from sqlalchemy.orm import Session
 from sqlalchemy import insert, select
@@ -105,7 +106,7 @@ class MSPReader:
             return self.adduct_cache[formula]
 
         try:
-            charge, delta = infer_precursor_delta(formula)
+            charge, delta, multiplication_factor = infer_precursor_delta(formula)
         except ValueError:
             logger.warning("Skipping precursor: %s", formula)
             return None
@@ -113,7 +114,8 @@ class MSPReader:
         stmt = insert(AdductType).values(
             formula=formula,
             delta_mass=delta,
-            charge=charge
+            charge=charge,
+            multiplication_factor=multiplication_factor
         ).prefix_with("OR IGNORE")
 
         self.session.execute(stmt)
@@ -128,7 +130,7 @@ class MSPReader:
     # ---------- compound ----------
     def _get_or_create_compound(self, entry):
 
-        inchikey = entry.get("INCHIKEY")
+        inchikey = entry.get("INCHIKEY").strip().upper() if "INCHIKEY" in entry else None
 
         if inchikey in self.compound_cache:
             return self.compound_cache[inchikey]
@@ -171,7 +173,7 @@ class MSPReader:
             precursor_mz=float(entry["PRECURSORMZ"]),
             adduct_type_id=adduct_id,
             polarity=self._normalize_polarity(entry.get("IONMODE")),
-            collision_energy=float(entry.get("COLLISIONENERGY") or 0.0),
+            collision_energy=parse_collision_energy(entry.get("COLLISIONENERGY")),
             spectrum_hash=spectrum_hash,
             mz_array=mz,
             intensity_array=intensity
@@ -225,3 +227,9 @@ class MSPReader:
         if normalized is None:
             logger.warning("Unrecognized polarity value: %s", value)
         return normalized
+
+def parse_collision_energy(value):
+    if not value:
+        return 0.0
+    match = re.search(r"[\d.]+", str(value))
+    return float(match.group()) if match else 0.0

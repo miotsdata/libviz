@@ -197,7 +197,8 @@ class Library:
         with self.session_scope() as session:
             adducts = session.query(AdductType).all()
             return [{"id": a.id, "formula": a.formula, "charge": a.charge, 
-                     "delta_mass": a.delta_mass} for a in adducts]
+                     "delta_mass": a.delta_mass, "multiplication_factor": a.multiplication_factor} 
+                     for a in adducts]
 
 
     def get_adduct_delta(self, adduct_id: int):

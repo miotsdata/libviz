@@ -21,10 +21,12 @@ def infer_precursor_delta(name: str) -> tuple[int, float]:
     charge = sign * magnitude
 
     # ---------- Extract content inside brackets ----------
-    inner_match = re.search(r'\[M([^\]]+)\]', name)
+    inner_match = re.search(r'\[(\d*)M([^\]]+)\]', name)
     if not inner_match:
         raise ValueError(f"Cannot extract modifications from precursor: {name}")
-    content = inner_match.group(1)  # e.g., "+H", "+2Na-H"
+    multiplication_factor = int(inner_match.group(1)) if inner_match.group(1) else 1
+    content = inner_match.group(2)  # e.g., "+H", "+2Na-H"
+    content = content.replace("FA-H", "HCOO").replace("Hac", "CH3COOH")
 
     # ---------- Parse all modifications ----------
     delta = 0.0
@@ -36,7 +38,7 @@ def infer_precursor_delta(name: str) -> tuple[int, float]:
         # compute mass
         delta += mod_sign * count * calculate_mass(formula=formula)
 
-    return charge, delta
+    return charge, delta, multiplication_factor
 
 
 def calculate_exact_mass(formula: str, n_decimals: int = 4) -> float | None:
