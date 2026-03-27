@@ -78,3 +78,11 @@ class LibraryManager:
                 r['library_path'] = lib.path
                 identical_spectra.append(r)
         return identical_spectra
+
+
+    def convert_from_msp_to_db(self, msp_path: str | Path):
+        msp_path = msp_path if isinstance(msp_path, Path) else Path(msp_path)
+
+        lib = Library.loadFromMSP(msp_path)
+        db_path = msp_path.with_suffix('.db')
+        lib.save_as_db(db_path)

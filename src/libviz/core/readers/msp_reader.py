@@ -2,223 +2,196 @@ import logging
 from pathlib import Path
 import numpy as np
 import re
+from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session
-from sqlalchemy import insert, select
 
-from libviz.core.db.models import (
-    Compound,
-    Spectrum,
-    SpectrumMetadata,
-    AdductType,
-    calculate_spectrum_hash
-)
-
-from libviz.core.utils import (
-    parse_msp,
-    calculate_exact_mass,
-    infer_precursor_delta
-)
-
-
+from libviz.core.db.models import calculate_spectrum_hash
+from libviz.core.utils import parse_msp, calculate_exact_mass, infer_precursor_delta
 
 POLARITY_MAP = {
-    "positive": "POSITIVE",
-    "pos": "POSITIVE",
-    "p": "POSITIVE",
-    "negative": "NEGATIVE",
-    "neg": "NEGATIVE",
-    "n": "NEGATIVE",
+    "positive": "POSITIVE", "pos": "POSITIVE", "p": "POSITIVE",
+    "negative": "NEGATIVE", "neg": "NEGATIVE", "n": "NEGATIVE",
+}
+
+KNOWN_KEYS = {
+    "NAME", "FORMULA", "INCHIKEY", "EXACTMASS",
+    "PRECURSORMZ", "PRECURSORTYPE", "IONMODE", "COLLISIONENERGY", "peaks"
 }
 
 logger = logging.getLogger(__name__)
 
+
 class MSPReader:
 
-    BATCH_SIZE = 1000
+    BATCH_SIZE = 2500
 
     def __init__(self, session: Session):
         self.session = session
-        self._counter = 0
-        self.adduct_cache = {}
-        self.compound_cache = {}
+        self.adduct_cache: dict[str, int] = {}
+        self.compound_cache: dict[str, int] = {}
 
     # ---------- public API ----------
     def import_file(self, msp_path: Path):
-
-        logger.debug("Starting import of MSP file: %s", msp_path)
-
         if not isinstance(msp_path, Path):
             raise TypeError(f"Msp_path should be a Path object. Found {type(msp_path).__name__}")
 
-        for entry in parse_msp(msp_path):
-            self._insert_entry(entry)
+        logger.debug("Starting import of MSP file: %s", msp_path)
 
-            self._counter += 1
-            if self._counter % self.BATCH_SIZE == 0:
-                self.session.commit()
+        compound_rows: list[dict] = []
+        spectrum_rows: list[dict] = []
+
+        for i, entry in enumerate(parse_msp(msp_path), start=1):
+            logger.debug("Processing entry %d", i)
+            self._collect_entry(entry, compound_rows, spectrum_rows)
+
+            if i % self.BATCH_SIZE == 0:
+                self._flush(compound_rows, spectrum_rows)
+                compound_rows.clear()
+                spectrum_rows.clear()
+
+        self._flush(compound_rows, spectrum_rows)
+        self.session.commit()
+        logger.debug("Import complete.")
+
+    # ---------- collect ----------
+    def _collect_entry(self, entry, compound_rows, spectrum_rows):
+        formula = entry.get("PRECURSORTYPE")
+
+        conn = self.session.connection()
+
+        if formula not in self.adduct_cache:
+            try:
+                charge, delta, multiplication_factor = infer_precursor_delta(formula)
+            except ValueError:
+                logger.warning("Skipping unknown precursor type: %s", formula)
+                return
+
+            conn.exec_driver_sql(
+                "INSERT OR IGNORE INTO adduct_type (formula, delta_mass, charge, multiplication_factor) "
+                "VALUES (?, ?, ?, ?)",
+                (formula, delta, charge, multiplication_factor)
+            )
+            row = conn.exec_driver_sql(
+                "SELECT id FROM adduct_type WHERE formula = ?", (formula,)
+            ).fetchone()
+            self.adduct_cache[formula] = row[0]
+
+        adduct_id = self.adduct_cache[formula]
+        inchikey = entry.get("INCHIKEY", "").strip().upper() or None
+
+        if inchikey not in self.compound_cache:
+            exact_mass = (
+                float(entry["EXACTMASS"])
+                if "EXACTMASS" in entry
+                else calculate_exact_mass(entry.get("FORMULA"))
+            )
+            compound_rows.append({
+                "name":       entry.get("NAME"),
+                "formula":    entry.get("FORMULA"),
+                "inchikey":   inchikey,
+                "exact_mass": exact_mass,
+            })
+            self.compound_cache[inchikey] = None
+
+        mz, intensity = self._prepare_peaks(entry)
+        spectrum_hash = calculate_spectrum_hash(mz, intensity)
+        extra = {k: v for k, v in entry.items() if k not in KNOWN_KEYS}
+
+        spectrum_rows.append({
+            "_inchikey":  inchikey,
+            "_adduct_id": adduct_id,
+            "_mz":        mz,
+            "_intensity": intensity,
+            "_hash":      spectrum_hash,
+            "_entry":     entry,
+            "_metadata":  extra,
+        })
+
+    # ---------- flush ----------
+    def _flush(self, compound_rows, spectrum_rows):
+        if not spectrum_rows:
+            return
+
+        now = datetime.now(UTC).isoformat()
+        conn = self.session.connection()
+
+        # 1. Bulk insert compounds
+        if compound_rows:
+            conn.exec_driver_sql(
+                "INSERT OR IGNORE INTO compound (name, formula, inchikey, exact_mass, added_on) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [(r["name"], r["formula"], r["inchikey"], r["exact_mass"], now)
+                 for r in compound_rows]
+            )
+            inchikeys = tuple(r["inchikey"] for r in compound_rows)
+            placeholders = ",".join("?" * len(inchikeys))
+            rows = conn.exec_driver_sql(
+                f"SELECT id, inchikey FROM compound WHERE inchikey IN ({placeholders})",
+                inchikeys
+            ).fetchall()
+            for compound_id, inchikey in rows:
+                self.compound_cache[inchikey] = compound_id
+
+        # 2. Split by metadata presence
+        needs_meta = [r for r in spectrum_rows if r["_metadata"]]
+        no_meta    = [r for r in spectrum_rows if not r["_metadata"]]
+
+        # 2a. Bulk insert spectra without metadata
+        if no_meta:
+            conn.exec_driver_sql(
+                "INSERT OR IGNORE INTO spectrum "
+                "(compound_id, precursor_mz, adduct_type_id, polarity, "
+                " collision_energy, spectrum_hash, mz_array, intensity_array, added_on) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [self._build_spectrum_tuple(r, now) for r in no_meta]
+            )
+
+        # 2b. Insert spectra with metadata one by one to capture rowid
+        meta_rows = []
+        for row in needs_meta:
+            cursor = conn.exec_driver_sql(
+                "INSERT OR IGNORE INTO spectrum "
+                "(compound_id, precursor_mz, adduct_type_id, polarity, "
+                " collision_energy, spectrum_hash, mz_array, intensity_array, added_on) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                self._build_spectrum_tuple(row, now)
+            )
+            if cursor.rowcount == 0:
+                continue
+            sid = cursor.lastrowid
+            for k, v in row["_metadata"].items():
+                meta_rows.append((sid, k, str(v)))
+
+        if meta_rows:
+            conn.exec_driver_sql(
+                "INSERT OR IGNORE INTO spectrum_metadata (spectrum_id, key, value) "
+                "VALUES (?, ?, ?)",
+                meta_rows
+            )
 
         self.session.commit()
 
-    # ---------- entry processing ----------
-    def _insert_entry(self, entry):
-
-        mz, intensity = self._prepare_peaks(entry)
-        mz_bytes = mz.tobytes()
-        intensity_bytes = intensity.tobytes()
-
-        spectrum_hash = calculate_spectrum_hash(mz, intensity)
-
-        adduct_id = self._get_or_create_adduct(entry)
-        if adduct_id is None:
-            return
-
-        compound_id = self._get_or_create_compound(entry)
-
-        spectrum_id = self._insert_spectrum(
-            compound_id,
-            adduct_id,
-            entry,
-            mz_bytes,
-            intensity_bytes,
-            spectrum_hash
+    # ---------- helpers ----------
+    def _build_spectrum_tuple(self, row, now: str) -> tuple:
+        entry = row["_entry"]
+        return (
+            self.compound_cache[row["_inchikey"]],
+            float(entry["PRECURSORMZ"]),
+            row["_adduct_id"],
+            self._normalize_polarity(entry.get("IONMODE")),
+            parse_collision_energy(entry.get("COLLISIONENERGY")),
+            row["_hash"],
+            row["_mz"].tobytes(),
+            row["_intensity"].tobytes(),
+            now,
         )
 
-        if spectrum_id:
-            self._insert_metadata(spectrum_id, entry)
-
-    # ---------- helpers ----------
     def _prepare_peaks(self, entry):
-
         mz = np.array([float(m) for m, _ in entry.get("peaks", [])], dtype=np.float32)
         intensity = np.array([float(i) for _, i in entry.get("peaks", [])], dtype=np.float32)
-
         order = np.argsort(mz)
-
         return mz[order], intensity[order]
-
-    # ---------- adduct ----------
-    def _get_or_create_adduct(self, entry):
-
-        formula = entry.get("PRECURSORTYPE")
-
-        if formula in self.adduct_cache:
-            return self.adduct_cache[formula]
-
-        try:
-            charge, delta, multiplication_factor = infer_precursor_delta(formula)
-        except ValueError:
-            logger.warning("Skipping precursor: %s", formula)
-            return None
-
-        stmt = insert(AdductType).values(
-            formula=formula,
-            delta_mass=delta,
-            charge=charge,
-            multiplication_factor=multiplication_factor
-        ).prefix_with("OR IGNORE")
-
-        self.session.execute(stmt)
-
-        stmt = select(AdductType.id).where(AdductType.formula == formula)
-        adduct_id = self.session.execute(stmt).scalar()
-
-        self.adduct_cache[formula] = adduct_id
-
-        return adduct_id
-
-    # ---------- compound ----------
-    def _get_or_create_compound(self, entry):
-
-        inchikey = entry.get("INCHIKEY").strip().upper() if "INCHIKEY" in entry else None
-
-        if inchikey in self.compound_cache:
-            return self.compound_cache[inchikey]
-
-        exact_mass = (
-            float(entry["EXACTMASS"])
-            if "EXACTMASS" in entry
-            else calculate_exact_mass(entry.get("FORMULA"))
-        )
-
-        stmt = insert(Compound).values(
-            name=entry.get("NAME"),
-            formula=entry.get("FORMULA"),
-            inchikey=inchikey,
-            exact_mass=exact_mass
-        ).prefix_with("OR IGNORE")
-
-        self.session.execute(stmt)
-
-        stmt = select(Compound.id).where(Compound.inchikey == inchikey)
-        compound_id = self.session.execute(stmt).scalar()
-
-        self.compound_cache[inchikey] = compound_id
-
-        return compound_id
-
-    # ---------- spectrum ----------
-    def _insert_spectrum(
-        self,
-        compound_id: int,
-        adduct_id: int,
-        entry: dict,
-        mz: bytes,
-        intensity: bytes,
-        spectrum_hash: str
-    ):
-
-        stmt = insert(Spectrum).values(
-            compound_id=compound_id,
-            precursor_mz=float(entry["PRECURSORMZ"]),
-            adduct_type_id=adduct_id,
-            polarity=self._normalize_polarity(entry.get("IONMODE")),
-            collision_energy=parse_collision_energy(entry.get("COLLISIONENERGY")),
-            spectrum_hash=spectrum_hash,
-            mz_array=mz,
-            intensity_array=intensity
-        ).prefix_with("OR IGNORE")
-
-        result = self.session.execute(stmt)
-
-        if result.rowcount == 0:
-            return None
-
-        return result.inserted_primary_key[0]
-
-    # ---------- metadata ----------
-    def _insert_metadata(self, spectrum_id, entry):
-
-        known_keys = {
-            "NAME",
-            "FORMULA",
-            "INCHIKEY",
-            "EXACTMASS",
-            "PRECURSORMZ",
-            "PRECURSORTYPE",
-            "IONMODE",
-            "COLLISIONENERGY",
-            "peaks"
-        }
-
-        rows = []
-
-        for key, value in entry.items():
-
-            if key in known_keys:
-                continue
-
-            rows.append(
-                {
-                    "spectrum_id": spectrum_id,
-                    "key": key,
-                    "value": str(value)
-                }
-            )
-
-        if rows:
-            self.session.execute(insert(SpectrumMetadata), rows)
-
 
     def _normalize_polarity(self, value: str | None) -> str | None:
         if value is None:
@@ -227,6 +200,7 @@ class MSPReader:
         if normalized is None:
             logger.warning("Unrecognized polarity value: %s", value)
         return normalized
+
 
 def parse_collision_energy(value):
     if not value:

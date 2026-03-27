@@ -24,67 +24,6 @@ def test_prepare_peaks_sorts_values(session):
 
 
 
-def test_create_adduct(session):
-
-    reader = MSPReader(session)
-
-    entry = {"PRECURSORTYPE": "[M+H]+"}
-
-    adduct_id = reader._get_or_create_adduct(entry)
-
-    adduct = session.get(AdductType, adduct_id)
-
-    assert adduct.formula == "[M+H]+"
-    assert adduct.charge == 1
-
-
-def test_reuse_existing_adduct(session):
-
-    reader = MSPReader(session)
-
-    entry = {"PRECURSORTYPE": "[M+H]+"}
-
-    a1 = reader._get_or_create_adduct(entry)
-    a2 = reader._get_or_create_adduct(entry)
-
-    assert a1 == a2
-
-
-
-def test_create_compound(session):
-
-    reader = MSPReader(session)
-
-    entry = {
-        "NAME": "benzene",
-        "FORMULA": "C6H6",
-        "INCHIKEY": "UHOVQNZJYSORNB-UHFFFAOYSA-N",
-        "EXACTMASS": "78.04695"
-    }
-
-    compound_id = reader._get_or_create_compound(entry)
-
-    compound = session.get(Compound, compound_id)
-
-    assert compound.name == "benzene"
-    assert compound.formula == "C6H6"
-
-
-def test_reuse_existing_compound(session):
-
-    reader = MSPReader(session)
-
-    entry = {
-        "NAME": "benzene",
-        "FORMULA": "C6H6",
-        "INCHIKEY": "TESTKEY"
-    }
-
-    c1 = reader._get_or_create_compound(entry)
-    c2 = reader._get_or_create_compound(entry)
-
-    assert c1 == c2
-
 
 def test_insert_spectrum(session):
 
