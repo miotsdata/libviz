@@ -57,8 +57,8 @@ class Spectrum(Base):
         intensity: np.ndarray,
     ):
         
-        mz = np.asarray(mz, dtype=np.float32)
-        intensity = np.asarray(intensity, dtype=np.float32)
+        mz = np.asarray(mz, dtype="<f4")
+        intensity = np.asarray(intensity, dtype="<f4")
         order = np.argsort(mz)
         mz = np.round(mz[order], 4)
         intensity = np.round(intensity[order], 2)
@@ -76,14 +76,14 @@ class Spectrum(Base):
         )
 
     def mz_numpy(self) -> np.ndarray:
-        return np.frombuffer(self.mz_array, dtype=np.float32)
+        return np.frombuffer(self.mz_array, dtype="<f4")
 
     def intensity_numpy(self) -> np.ndarray:
-        return np.frombuffer(self.intensity_array, dtype=np.float32)
+        return np.frombuffer(self.intensity_array, dtype="<f4")
 
 
 def calculate_spectrum_hash(mz: np.ndarray, intensity: np.ndarray) -> str:
     h = hashlib.sha256()
-    h.update(np.asarray(mz, dtype=np.float32).tobytes())
-    h.update(np.asarray(intensity, dtype=np.float32).tobytes())
+    h.update(np.asarray(mz, dtype="<f4").tobytes())
+    h.update(np.asarray(intensity, dtype="<f4").tobytes())
     return h.hexdigest()
