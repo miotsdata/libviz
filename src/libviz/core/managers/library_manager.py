@@ -60,10 +60,10 @@ class LibraryManager:
         return len(self._libraries)
 
 
-    def get_identical_spectra(self, 
-                              precursor_mz: float, 
-                              polarity: str, 
-                              hash_ref: str, 
+    def get_identical_spectra(self,
+                              precursor_mz: float,
+                              polarity: str,
+                              hash_ref: str,
                               ppm_tolerance: float) -> list[dict]:
         """Return list of spectra that are identical to the given spectrum."""
         identical_spectra = []

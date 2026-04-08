@@ -38,7 +38,7 @@ ApplicationWindow {
 
             MenuItem {
                 text: qsTr("Load from .db…")
-                onTriggered: { /* TODO */ }
+                onTriggered: dbFileDialog.open()
             }
         }
 
@@ -139,5 +139,12 @@ ApplicationWindow {
         title: qsTr("Select .msp file")
         nameFilters: ["MSP files (*.msp)", "All files (*)"]
         onAccepted: libraryManagerBridge.loadLibraryFromMsp(selectedFile)
+    }
+
+    FileDialog {
+        id: dbFileDialog
+        title: qsTr("Select .db file")
+        nameFilters: ["DB files (*.db)", "All files (*)"]
+        onAccepted: libraryManagerBridge.loadLibraryFromDb(selectedFile)
     }
 }

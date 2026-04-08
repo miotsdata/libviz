@@ -9,7 +9,7 @@ from PySide6.QtQuickControls2 import QQuickStyle # pylint: disable=no-name-in-mo
 from libviz.app import AppState, Navigation
 #from libviz.services.QModel.mock_model import MockCompoundModel
 from libviz.services.QModel import CompoundTableModel, SpectraTableModel, SpectrumPlotModel, AddSpectraTableModel, AdductListModel, IdenticalSpectraCompoundListModel
-from libviz.utils import configure_logging
+from libviz.old.utils import configure_logging
 from libviz.backends import CreateLibraryBackend, LoadLibraryBackend, LoadMzmlBackend, AddSpectraBackend
 from libviz.services import LibraryService
 
