@@ -1,5 +1,6 @@
 from pathlib import Path
 from libviz.core.library import Library
+import pandas as pd
 
 class LibraryManager:
 
@@ -64,7 +65,8 @@ class LibraryManager:
                               precursor_mz: float,
                               polarity: str,
                               hash_ref: str,
-                              ppm_tolerance: float) -> list[dict]:
+                              ppm_tolerance: float,
+                              return_pd: bool = False) -> list[dict] | pd.DataFrame:
         """Return list of spectra that are identical to the given spectrum."""
         identical_spectra = []
         for lib in self._libraries.values():
@@ -77,6 +79,9 @@ class LibraryManager:
             for r in res:
                 r['library_path'] = lib.path
                 identical_spectra.append(r)
+        
+        if return_pd:
+            return pd.DataFrame(identical_spectra)
         return identical_spectra
 
 
