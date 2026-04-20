@@ -2,21 +2,35 @@
 name = "LibViz"
 version = "0.1.0"
 description = "App to visualize MS library spectra"
-authors = [
-    {name = "Matteo Miotto", email = "miotsdata@gmail.com"},
+authors = [{ name = "Matteo Miotto", email = "miotsdata@gmail.com" }]
+# Core-only dependencies (no GUI)
+dependencies = [
+    "sqlalchemy>=2.0.46",
+    "alembic>=1.18.4",
+    "pandas>=3.0.0",
+    "numpy>=2.4.2",
+    "pyteomics>=4.7.5",
+    "tqdm>=4.67.3",
+    "lxml>=6.0.2",
 ]
-dependencies = ["sqlalchemy>=2.0.46", "pyside6>=6.10.2", "pyqt6>=6.10.2", "alembic>=1.18.4", "pandas>=3.0.0", "numpy>=2.4.2", "PySide6-Essentials>=6.10.2", "pyteomics>=4.7.5", "tqdm>=4.67.3", "lxml>=6.0.2"]
 requires-python = "==3.13"
 readme = "README.md"
-license = {text = "MIT"}
+license = { text = "MIT" }
+
+# Optional extras
+[project.optional-dependencies]
+gui = ["pyside6>=6.10.2", "pyqt6>=6.10.2", "PySide6-Essentials>=6.10.2"]
+all = ["libviz[gui]"]
 
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
-
 [tool.pdm]
 distribution = true
+
+[tool.pdm.build]
+excludes = ["src/libviz/old", "tests", "**/.DS_Store"]
 
 [dependency-groups]
 dev = [
