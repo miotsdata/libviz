@@ -11,12 +11,15 @@ class Compound(Base):
 
     name = Column(String(collation="NOCASE"), index=True)
     formula = Column(String, index=True)
-    inchikey = Column(String, unique=True, nullable=False)
     exact_mass = Column(Float, index=True)
+    inchikey = Column(String, unique=True, nullable=False)
+    smiles = Column(String, index=True, unique=True)
+    pubchem_id = Column(Integer, index=True, unique=True)
     added_on = Column(
         DateTime(timezone=True),
         default=datetime.now,
         nullable=False
     )
+
 
     spectra = relationship("Spectrum", back_populates="compound")

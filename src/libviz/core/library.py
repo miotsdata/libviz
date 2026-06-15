@@ -48,6 +48,7 @@ class Library:
             cursor.execute("PRAGMA synchronous=OFF")
             cursor.close()
 
+
     @classmethod
     def create(cls, path: Path, name: str):
 

@@ -11,7 +11,9 @@ class TestCompound:
             name="Test Compound",
             formula="C6H12O6",
             inchikey="TESTINCHIKEY1234567890",
-            exact_mass=180.0634
+            exact_mass=180.0634,
+            smiles="C(C1C(C(C(C(O1)O)O)O)O)O",
+            pubchem_id=12345
         )
         session.add(compound)
         session.commit()
@@ -22,6 +24,8 @@ class TestCompound:
         assert compound.inchikey == "TESTINCHIKEY1234567890"
         assert compound.exact_mass == 180.0634
         assert compound.added_on is not None
+        assert compound.smiles == "C(C1C(C(C(C(O1)O)O)O)O)O"
+        assert compound.pubchem_id == 12345
 
     def test_unique_inchikey(self, session):
         compound1 = Compound(
@@ -35,6 +39,54 @@ class TestCompound:
             formula="C7H14O7",
             inchikey="UNIQUEINCHIKEY",
             exact_mass=190.0
+        )
+        session.add(compound1)
+        session.commit()
+
+        session.add(compound2)
+        with pytest.raises(IntegrityError):
+            session.commit()
+
+    def test_unique_smiles(self, session):
+        compound1 = Compound(
+            name="Compound1",
+            formula="C6H12O6",
+            inchikey="UNIQUESMILESINCHI2314",
+            exact_mass=180.0,
+            smiles="C(C2C(C(C(C(O1)O)O)O)O)O",
+            pubchem_id=1234567
+        )
+        compound2 = Compound(
+            name="Compound2",
+            formula="C7H14O7",
+            inchikey="UNIQUESMILESINCHI2",
+            exact_mass=190.0,
+            smiles="C(C2C(C(C(C(O1)O)O)O)O)O",
+            pubchem_id=12346
+        )
+        session.add(compound1)
+        session.commit()
+
+        session.add(compound2)
+        with pytest.raises(IntegrityError):
+            session.commit()
+
+    def test_unique_pubchem_id(self, session):
+        compound1 = Compound(
+            name="Compound1",
+            formula="C6H12O6",
+            inchikey="UNIQUEPUBCHEMINCHI3",
+            exact_mass=180.0,
+            smiles="C(C1C(C(C(C(O1)O)O)O)O)OCCCCC",
+            pubchem_id=12345768
+        )
+        compound2 = Compound(
+            name="Compound2",
+            formula="C7H14O7",
+            inchikey="UNIQUEPUBCHEMINCHI4",
+            exact_mass=190.0,
+            smiles="C(C1C(C(C(C(O1)O)O)O)O)O))",
+            pubchem_id=12345768
         )
         session.add(compound1)
         session.commit()
