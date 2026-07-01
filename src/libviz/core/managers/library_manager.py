@@ -83,6 +83,27 @@ class LibraryManager:
         if return_pd:
             return pd.DataFrame(identical_spectra)
         return identical_spectra
+    
+    def get_spectra_in_mz_range(self,
+                              mz_min: float,
+                              mz_max: float,
+                              polarity: str | None = None,
+                              return_pd: bool = False) -> list[dict] | pd.DataFrame:
+        """Return list of spectra that are in the given m/z range."""
+        spectra = []
+        for lib in self._libraries.values():
+            res: list[dict] = lib.get_spectra_in_mz_range(
+                mz_min=mz_min,
+                mz_max=mz_max,
+                polarity=polarity
+            )
+            for r in res:
+                r['library_path'] = lib.path
+                spectra.append(r)
+        
+        if return_pd:
+            return pd.DataFrame(spectra)
+        return spectra
 
 
     def convert_from_msp_to_db(self, msp_path: str | Path):

@@ -396,3 +396,33 @@ class Library:
                                       "spectrum_id": candidate_spectrum.id})
 
             return compounds
+
+    def get_spectra_in_mz_range(
+        self,
+        mz_min: float,
+        mz_max: float,
+        polarity: str | None = None,
+    ) -> list[dict]:
+        """Return spectra with precursor_mz in [mz_min, mz_max]."""
+        with self.session_scope() as session:
+            query = session.query(Spectrum, Compound).join(
+                Compound, Compound.id == Spectrum.compound_id
+            ).filter(
+                Spectrum.precursor_mz >= mz_min,
+                Spectrum.precursor_mz <= mz_max,
+            )
+            if polarity is not None:
+                query = query.filter(Spectrum.polarity == polarity)
+
+            return [
+                {
+                    "spectrum_id": s.id,
+                    "compound_id": c.id,
+                    "compound_name": c.name,
+                    "compound_formula": c.formula,
+                    "inchikey": c.inchikey,
+                    "mz": s.mz,           # however Spectrum stores/exposes the array
+                    "intensity": s.intensity,
+                }
+                for s, c in query.all()
+            ]
