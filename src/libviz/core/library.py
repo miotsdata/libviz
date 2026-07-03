@@ -1,6 +1,7 @@
 from pathlib import Path
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import sessionmaker
+import numpy as np
 import logging
 import tempfile
 import sqlite3
@@ -127,7 +128,7 @@ class Library:
 
     # ---------- Loading ----------
     @classmethod
-    def loadFromMSP(cls, msp_path: Path):
+    def loadFromMSP(cls, msp_path: Path, default_precursor_type: str = "[M+H]+"):
 
         logger.debug("Loading library from MSP file %s", msp_path)
 
@@ -143,7 +144,7 @@ class Library:
 
         with lib.session_scope() as session:
 
-            reader = MSPReader(session)
+            reader = MSPReader(session, default_precursor_type=default_precursor_type)
             reader.import_file(msp_path)
 
             lib._n_compounds = session.query(Compound).count()
@@ -402,6 +403,7 @@ class Library:
         mz_min: float,
         mz_max: float,
         polarity: str | None = None,
+        convert_arrays: bool = True
     ) -> list[dict]:
         """Return spectra with precursor_mz in [mz_min, mz_max]."""
         with self.session_scope() as session:
@@ -411,6 +413,11 @@ class Library:
                 Spectrum.precursor_mz >= mz_min,
                 Spectrum.precursor_mz <= mz_max,
             )
+            def _to_numpy_array(value):
+                if isinstance(value, (bytes, bytearray)):
+                    return np.frombuffer(value, dtype=np.float32).copy()
+                return value
+
             if polarity is not None:
                 query = query.filter(Spectrum.polarity == polarity)
 
@@ -421,8 +428,8 @@ class Library:
                     "compound_name": c.name,
                     "compound_formula": c.formula,
                     "inchikey": c.inchikey,
-                    "mz": s.mz,           # however Spectrum stores/exposes the array
-                    "intensity": s.intensity,
+                    "mz": _to_numpy_array(s.mz_array).tolist() if convert_arrays else _to_numpy_array(s.mz_array),
+                    "intensity": _to_numpy_array(s.intensity_array).tolist() if convert_arrays else _to_numpy_array(s.intensity_array),
                 }
                 for s, c in query.all()
             ]

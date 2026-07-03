@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:a56be360dcfaeb43cd9a4cc76cd160d91dc35198c392701fcc61b34dbdb08181"
+content_hash = "sha256:d7036e193e4dec8754ce166660ce66b69c8f59f21a6af2ee629d07171a4e9e0c"
 
 [[metadata.targets]]
 requires_python = "==3.13"
@@ -486,59 +486,11 @@ files = [
 ]
 
 [[package]]
-name = "pyqt6"
-version = "6.10.2"
-requires_python = ">=3.9"
-summary = "Python bindings for the Qt cross platform application toolkit"
-groups = ["default"]
-dependencies = [
-    "PyQt6-Qt6<6.11.0,>=6.10.0",
-    "PyQt6-sip<14,>=13.8",
-]
-files = [
-    {file = "pyqt6-6.10.2-cp39-abi3-macosx_10_14_universal2.whl", hash = "sha256:37ae7c1183fe4dd0c6aefd2006a35731245de1cb6f817bb9e414a3e4848dfd6d"},
-    {file = "pyqt6-6.10.2-cp39-abi3-manylinux_2_34_x86_64.whl", hash = "sha256:78e1b3d5763e4cbc84485aef600e0aba5e1932fd263b716f92cd1a40dfa5e924"},
-    {file = "pyqt6-6.10.2-cp39-abi3-manylinux_2_39_aarch64.whl", hash = "sha256:bbc3af541bbecd27301bfe69fe445aa1611a9b490bd3de77306b12df632f7ec6"},
-    {file = "pyqt6-6.10.2-cp39-abi3-win_amd64.whl", hash = "sha256:bd328cb70bc382c48861cd5f0a11b2b8ae6f5692d5a2d6679ba52785dced327b"},
-    {file = "pyqt6-6.10.2-cp39-abi3-win_arm64.whl", hash = "sha256:7901ba1df024b7ee9fdacfb2b7661aeb3749ae8b0bef65428077de3e0450eabb"},
-    {file = "pyqt6-6.10.2.tar.gz", hash = "sha256:6c0db5d8cbb9a3e7e2b5b51d0ff3f283121fa27b864db6d2f35b663c9be5cc83"},
-]
-
-[[package]]
-name = "pyqt6-qt6"
-version = "6.10.2"
-summary = "The subset of a Qt installation needed by PyQt6."
-groups = ["default"]
-files = [
-    {file = "pyqt6_qt6-6.10.2-py3-none-macosx_10_14_x86_64.whl", hash = "sha256:5761cfccc721da2311c3f1213577f0ff1df07bbbbe3fa3a209a256b82cf057e3"},
-    {file = "pyqt6_qt6-6.10.2-py3-none-macosx_11_0_arm64.whl", hash = "sha256:6dda853a8db1b8d1a2ddbbe76cc6c3aa86614cad14056bd3c0435d8feea73b2d"},
-    {file = "pyqt6_qt6-6.10.2-py3-none-manylinux_2_34_x86_64.whl", hash = "sha256:19c10b5f0806e9f9bac2c9759bd5d7d19a78967f330fd60a2db409177fa76e49"},
-    {file = "pyqt6_qt6-6.10.2-py3-none-manylinux_2_39_aarch64.whl", hash = "sha256:2e60d616861ca4565cd295418d605975aa2dc407ba4b94c1586a70c92e9cb052"},
-    {file = "pyqt6_qt6-6.10.2-py3-none-win_amd64.whl", hash = "sha256:c4b7f7d66cc58bddf1bc1ca28dfcf7a45f58cfcb11d81d13a0510409dd4957ac"},
-    {file = "pyqt6_qt6-6.10.2-py3-none-win_arm64.whl", hash = "sha256:7164a6f0c1335358a3026df9865c8f75395b01f60f0dcd2f66c029ec16fc83d2"},
-]
-
-[[package]]
-name = "pyqt6-sip"
-version = "13.11.0"
-requires_python = ">=3.10"
-summary = "The sip module support for PyQt6"
-groups = ["default"]
-files = [
-    {file = "pyqt6_sip-13.11.0-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:929716eebde1a64ffdb6b1715db6a22aefd5634d6df84858c7deb5e85be84fdf"},
-    {file = "pyqt6_sip-13.11.0-cp313-cp313-manylinux1_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:a75144e8a0bcf9d1a9069011890401748af353749f1de1b6a314b880781edf9d"},
-    {file = "pyqt6_sip-13.11.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8082b5f57ffad5dddf5efcf0ef5eaf94841395aa4e7c374c79ef24cf49b0f0ce"},
-    {file = "pyqt6_sip-13.11.0-cp313-cp313-win_amd64.whl", hash = "sha256:8d49b5bf3d8d36cd7db93ddc54cd09dbba96a3fd926e445ef75499b41e47b5a3"},
-    {file = "pyqt6_sip-13.11.0-cp313-cp313-win_arm64.whl", hash = "sha256:293eac1b53c66c54b03266cc30015ec77454af679043a4f188b9bb80a9656996"},
-    {file = "pyqt6_sip-13.11.0.tar.gz", hash = "sha256:d463af37738bda1856c9ef513e5620a37b7a005e9d589c986c3304db4a8a14d3"},
-]
-
-[[package]]
 name = "pyside6"
 version = "6.10.2"
 requires_python = "<3.15,>=3.9"
 summary = "Python bindings for the Qt cross-platform application and UI framework"
-groups = ["default", "dev"]
+groups = ["dev"]
 dependencies = [
     "PySide6-Addons==6.10.2",
     "PySide6-Essentials==6.10.2",
@@ -557,7 +509,7 @@ name = "pyside6-addons"
 version = "6.10.2"
 requires_python = "<3.15,>=3.9"
 summary = "Python bindings for the Qt cross-platform application and UI framework (Addons)"
-groups = ["default", "dev"]
+groups = ["dev"]
 dependencies = [
     "PySide6-Essentials==6.10.2",
     "shiboken6==6.10.2",
@@ -575,7 +527,7 @@ name = "pyside6-essentials"
 version = "6.10.2"
 requires_python = "<3.15,>=3.9"
 summary = "Python bindings for the Qt cross-platform application and UI framework (Essentials)"
-groups = ["default", "dev"]
+groups = ["dev"]
 dependencies = [
     "shiboken6==6.10.2",
 ]
@@ -675,7 +627,7 @@ name = "shiboken6"
 version = "6.10.2"
 requires_python = "<3.15,>=3.9"
 summary = "Python/C++ bindings helper module"
-groups = ["default", "dev"]
+groups = ["dev"]
 files = [
     {file = "shiboken6-6.10.2-cp39-abi3-macosx_13_0_universal2.whl", hash = "sha256:3bd4e94e9a3c8c1fa8362fd752d399ef39265d5264e4e37bae61cdaa2a00c8c7"},
     {file = "shiboken6-6.10.2-cp39-abi3-manylinux_2_34_x86_64.whl", hash = "sha256:ace0790032d9cb0adda644b94ee28d59410180d9773643bb6cf8438c361987ad"},

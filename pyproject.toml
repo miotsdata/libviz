@@ -30,7 +30,9 @@ build-backend = "pdm.backend"
 distribution = true
 
 [tool.pdm.build]
+package-dir = "src"
 excludes = ["src/libviz/old", "tests", "**/.DS_Store"]
+includes = ["migrations/", "alembic.ini"]
 
 [dependency-groups]
 dev = [

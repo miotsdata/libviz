@@ -106,9 +106,9 @@ class LibraryManager:
         return spectra
 
 
-    def convert_from_msp_to_db(self, msp_path: str | Path):
+    def convert_from_msp_to_db(self, msp_path: str | Path, default_precursor_type: str = "[M+H]+", output_path: str | Path | None = None):
         msp_path = msp_path if isinstance(msp_path, Path) else Path(msp_path)
 
-        lib = Library.loadFromMSP(msp_path)
-        db_path = msp_path.with_suffix('.db')
+        lib = Library.loadFromMSP(msp_path, default_precursor_type=default_precursor_type)
+        db_path = Path(output_path) if output_path is not None else msp_path.with_suffix('.db')
         lib.save_as_db(db_path)
