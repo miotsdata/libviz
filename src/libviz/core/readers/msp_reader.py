@@ -5,6 +5,7 @@ import re
 from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session
+from pyteomics.auxiliary.structures import PyteomicsError
 
 from libviz.core.db.models import calculate_spectrum_hash
 from libviz.core.utils import parse_msp, calculate_exact_mass, infer_precursor_delta
@@ -26,10 +27,11 @@ class MSPReader:
 
     BATCH_SIZE = 2500
 
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, default_precursor_type: str = "[M+H]+"):
         self.session = session
         self.adduct_cache: dict[str, int] = {}
         self.compound_cache: dict[str, int] = {}
+        self.default_precursor_type: str = default_precursor_type
 
     # ---------- public API ----------
     def import_file(self, msp_path: Path):
@@ -56,14 +58,17 @@ class MSPReader:
 
     # ---------- collect ----------
     def _collect_entry(self, entry, compound_rows, spectrum_rows):
-        formula = entry.get("PRECURSORTYPE")
+        formula = entry.get("PRECURSORTYPE") or entry.get("PRECURSOR_TYPE")
 
-        conn = self.session.connection()
+        if not formula:
+            logger.warning("Entry missing PRECURSORTYPE, using default: %s", self.default_precursor_type)
+            formula = self.default_precursor_type
 
         if formula not in self.adduct_cache:
+            conn = self.session.connection()
             try:
                 charge, delta, multiplication_factor = infer_precursor_delta(formula)
-            except ValueError:
+            except (ValueError, PyteomicsError):
                 logger.warning("Skipping unknown precursor type: %s", formula)
                 return
 
@@ -86,6 +91,7 @@ class MSPReader:
                 if "EXACTMASS" in entry
                 else calculate_exact_mass(entry.get("FORMULA"))
             )
+
             compound_rows.append({
                 "name":       entry.get("NAME"),
                 "formula":    entry.get("FORMULA"),
@@ -163,7 +169,6 @@ class MSPReader:
             sid = cursor.lastrowid
             for k, v in row["_metadata"].items():
                 meta_rows.append((sid, k, str(v)))
-                print(meta_rows)
 
         if meta_rows:
             conn.exec_driver_sql(
@@ -179,10 +184,10 @@ class MSPReader:
         entry = row["_entry"]
         return (
             self.compound_cache[row["_inchikey"]],
-            float(entry["PRECURSORMZ"]),
+            float(entry["PRECURSORMZ"]) or float(entry.get("PrecursorMZ")),
             row["_adduct_id"],
             self._normalize_polarity(entry.get("IONMODE")),
-            parse_collision_energy(entry.get("COLLISIONENERGY")),
+            parse_collision_energy(entry.get("COLLISIONENERGY") or entry.get("COLLISION_ENERGY")),
             row["_hash"],
             row["_mz"].tobytes(),
             row["_intensity"].tobytes(),
@@ -202,7 +207,6 @@ class MSPReader:
         if normalized is None:
             logger.warning("Unrecognized polarity value: %s", value)
         return normalized
-
 
 def parse_collision_energy(value):
     if not value:
