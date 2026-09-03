@@ -1,6 +1,6 @@
 [project]
 name = "LibViz"
-version = "0.1.2"
+version = "0.1.3"
 description = "App to visualize MS library spectra"
 authors = [{ name = "Matteo Miotto", email = "miotsdata@gmail.com" }]
 # Core-only dependencies (no GUI)
@@ -31,8 +31,8 @@ distribution = true
 
 [tool.pdm.build]
 package-dir = "src"
+includes = ["src/libviz/"]
 excludes = ["src/libviz/old", "tests", "**/.DS_Store"]
-includes = ["migrations/", "alembic.ini"]
 
 [dependency-groups]
 dev = [
