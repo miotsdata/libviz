@@ -3,8 +3,8 @@ from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import sessionmaker
 import numpy as np
 import logging
+import shutil
 import tempfile
-import sqlite3
 
 from libviz.core.db.migrations import upgrade_library_schema
 from libviz.core.readers import MSPReader
@@ -105,21 +105,25 @@ class Library:
         if self.name == "NONAME":
             raise ValueError("Name cannot be NONAME. Please rename the library with the rename method.")
 
-        # ensure WAL is flushed
+        # ensure WAL is flushed into the main db file
         with self.engine.connect() as conn:
             conn.exec_driver_sql("PRAGMA wal_checkpoint(FULL);")
 
-        # close all pooled connections
+        # close all pooled connections -- self.path is now a complete,
+        # consistent, single-file snapshot with nothing else holding it open
         self.engine.dispose()
 
-        src = sqlite3.connect(self.path)
-        dest = sqlite3.connect(str(path))
-
-        try:
-            src.backup(dest)
-        finally:
-            dest.close()
-            src.close()
+        # A plain file copy rather than sqlite3's backup() API: backup()
+        # needs a real file lock on the destination, which some network
+        # filesystems (SMB/CIFS) don't honour -- the call can then hang
+        # indefinitely instead of erroring. The checkpoint above already
+        # makes self.path a complete, static file, so a straight sequential
+        # copy is correct and safe everywhere. Copy-then-rename keeps the
+        # write atomic -- a crash mid-copy never leaves a partial `path`.
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = path.with_name(path.name + ".tmp")
+        shutil.copy2(self.path, tmp_path)
+        tmp_path.replace(path)
 
         self.path = Path(path)
         self.is_temp = False

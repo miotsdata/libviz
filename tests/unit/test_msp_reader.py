@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from libviz.core.readers.msp_reader import MSPReader
 from libviz.core.db.models import AdductType, Compound, Spectrum, SpectrumMetadata
 from unittest.mock import patch
@@ -14,6 +15,42 @@ def test_prepare_peaks_sorts_values(session):
     assert list(intensity) == [10.0, 8.0, 5.0]
 
 
+def test_parse_precursor_mz_plain_value(session):
+    reader = MSPReader(session)
+    assert reader._parse_precursor_mz({"PRECURSORMZ": "79.5"}) == pytest.approx(79.5)
+
+
+def test_parse_precursor_mz_underscore_key_variant(session):
+    reader = MSPReader(session)
+    assert reader._parse_precursor_mz({"PRECURSOR_MZ": "79.5"}) == pytest.approx(79.5)
+
+
+def test_parse_precursor_mz_comma_decimal(session):
+    """Some exporters use a locale comma decimal, e.g. "197,9867"."""
+    reader = MSPReader(session)
+    assert reader._parse_precursor_mz({"PRECURSORMZ": "197,9867"}) == pytest.approx(197.9867)
+
+
+def test_parse_precursor_mz_missing_returns_none(session):
+    reader = MSPReader(session)
+    assert reader._parse_precursor_mz({}) is None
+
+
+def test_parse_precursor_mz_unparseable_returns_none(session):
+    reader = MSPReader(session)
+    assert reader._parse_precursor_mz({"PRECURSORMZ": "not-a-number"}) is None
+
+
+def test_parse_precursor_mz_zero_returns_none(session):
+    reader = MSPReader(session)
+    assert reader._parse_precursor_mz({"PRECURSORMZ": "0"}) is None
+
+
+def test_parse_precursor_mz_negative_returns_none(session):
+    reader = MSPReader(session)
+    assert reader._parse_precursor_mz({"PRECURSORMZ": "-5"}) is None
+
+
 def test_normalize_polarity(session):
     reader = MSPReader(session)
     assert reader._normalize_polarity("positive") == "POSITIVE"
@@ -24,6 +61,76 @@ def test_normalize_polarity(session):
     assert reader._normalize_polarity("n") == "NEGATIVE"
     assert reader._normalize_polarity("unknown") is None
     assert reader._normalize_polarity(None) is None
+
+
+def test_collect_entry_skips_missing_precursor_mz(session):
+    """A missing PRECURSORMZ used to KeyError deep inside _flush's batch
+    insert, crashing the whole import. It should now be skipped here,
+    per-entry, like an unrecognised PRECURSORTYPE already is."""
+    reader = MSPReader(session)
+    entry = {
+        "NAME": "benzene", "FORMULA": "C6H6", "INCHIKEY": "KEY1",
+        "PRECURSORTYPE": "[M+H]+", "IONMODE": "POSITIVE",
+        "COLLISIONENERGY": "20", "peaks": [(50, 10)],
+    }
+    compound_rows, spectrum_rows = [], []
+    reader._collect_entry(entry, compound_rows, spectrum_rows)
+
+    assert spectrum_rows == []
+    assert compound_rows == []
+
+
+def test_collect_entry_skips_zero_precursor_mz(session):
+    """A zero PRECURSORMZ used to hit a broken `x or float(entry.get(...))`
+    fallback (wrong key case) and raise TypeError instead of skipping."""
+    reader = MSPReader(session)
+    entry = {
+        "NAME": "benzene", "FORMULA": "C6H6", "INCHIKEY": "KEY1",
+        "PRECURSORTYPE": "[M+H]+", "PRECURSORMZ": "0",
+        "IONMODE": "POSITIVE", "COLLISIONENERGY": "20", "peaks": [(50, 10)],
+    }
+    compound_rows, spectrum_rows = [], []
+    reader._collect_entry(entry, compound_rows, spectrum_rows)
+
+    assert spectrum_rows == []
+
+
+def test_collect_entry_skips_comma_decimal_without_fix_would_crash(session):
+    """A comma-decimal PRECURSORMZ ("197,9867") used to raise ValueError
+    deep inside _flush; it's now normalised and kept."""
+    reader = MSPReader(session)
+    entry = {
+        "NAME": "benzene", "FORMULA": "C6H6", "INCHIKEY": "KEY1",
+        "PRECURSORTYPE": "[M+H]+", "PRECURSORMZ": "197,9867",
+        "IONMODE": "POSITIVE", "COLLISIONENERGY": "20", "peaks": [(50, 10)],
+    }
+    compound_rows, spectrum_rows = [], []
+    reader._collect_entry(entry, compound_rows, spectrum_rows)
+
+    assert len(spectrum_rows) == 1
+    assert spectrum_rows[0]["_precursor_mz"] == pytest.approx(197.9867)
+
+
+def test_build_spectrum_tuple_reads_underscore_ion_mode_key(session):
+    """Some exporters (e.g. MoNA) write "Ion_mode:", which parse_msp
+    upper-cases to the key "ION_MODE" -- the reader used to look up only
+    "IONMODE" (no underscore), silently leaving polarity NULL. Checked via
+    _build_spectrum_tuple directly (no _flush/commit) so this doesn't touch
+    the shared module-scoped engine other tests in this file depend on."""
+    reader = MSPReader(session)
+    entry = {
+        "NAME": "benzene", "FORMULA": "C6H6",
+        "INCHIKEY": "UHOVQNZJYSORNB-UHFFFAOYSA-N", "EXACTMASS": "78.04695",
+        "PRECURSORTYPE": "[M-H]-", "PRECURSORMZ": "77",
+        "ION_MODE": "N", "COLLISIONENERGY": "20",
+        "peaks": [(50, 10)],
+    }
+    compound_rows, spectrum_rows = [], []
+    reader._collect_entry(entry, compound_rows, spectrum_rows)
+    tup = reader._build_spectrum_tuple(spectrum_rows[0], "now")
+
+    polarity = tup[3]
+    assert polarity == "NEGATIVE"
 
 
 def test_collect_entry_creates_adduct(session):

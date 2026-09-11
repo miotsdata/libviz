@@ -58,6 +58,14 @@ class MSPReader:
 
     # ---------- collect ----------
     def _collect_entry(self, entry, compound_rows, spectrum_rows):
+        precursor_mz = self._parse_precursor_mz(entry)
+        if precursor_mz is None:
+            logger.warning(
+                "Skipping entry with missing/invalid PRECURSORMZ: %r",
+                entry.get("PRECURSORMZ") or entry.get("PRECURSOR_MZ"),
+            )
+            return
+
         formula = entry.get("PRECURSORTYPE") or entry.get("PRECURSOR_TYPE")
 
         if not formula:
@@ -105,13 +113,14 @@ class MSPReader:
         extra = {k: v for k, v in entry.items() if k not in KNOWN_KEYS}
 
         spectrum_rows.append({
-            "_inchikey":  inchikey,
-            "_adduct_id": adduct_id,
-            "_mz":        mz,
-            "_intensity": intensity,
-            "_hash":      spectrum_hash,
-            "_entry":     entry,
-            "_metadata":  extra,
+            "_inchikey":     inchikey,
+            "_adduct_id":    adduct_id,
+            "_precursor_mz": precursor_mz,
+            "_mz":           mz,
+            "_intensity":    intensity,
+            "_hash":         spectrum_hash,
+            "_entry":        entry,
+            "_metadata":     extra,
         })
 
     # ---------- flush ----------
@@ -184,9 +193,9 @@ class MSPReader:
         entry = row["_entry"]
         return (
             self.compound_cache[row["_inchikey"]],
-            float(entry["PRECURSORMZ"]) or float(entry.get("PrecursorMZ")),
+            row["_precursor_mz"],
             row["_adduct_id"],
-            self._normalize_polarity(entry.get("IONMODE")),
+            self._normalize_polarity(entry.get("IONMODE") or entry.get("ION_MODE")),
             parse_collision_energy(entry.get("COLLISIONENERGY") or entry.get("COLLISION_ENERGY")),
             row["_hash"],
             row["_mz"].tobytes(),
@@ -199,6 +208,28 @@ class MSPReader:
         intensity = np.array([float(i) for _, i in entry.get("peaks", [])], dtype=np.float32)
         order = np.argsort(mz)
         return mz[order], intensity[order]
+
+    def _parse_precursor_mz(self, entry: dict) -> float | None:
+        """Parse PRECURSORMZ (or the PRECURSOR_MZ key variant some
+        exporters use), tolerating a locale comma-decimal like "197,9867".
+
+        Returns ``None`` when the field is missing, unparseable, or not a
+        positive number -- callers should skip the entry entirely rather
+        than store a nonsensical precursor mass (the column is NOT NULL,
+        so a bad value would otherwise crash the batch insert, not just
+        this one entry).
+        """
+        raw = entry.get("PRECURSORMZ") or entry.get("PRECURSOR_MZ")
+        if raw is None:
+            return None
+        raw = str(raw).strip()
+        if "," in raw and "." not in raw:
+            raw = raw.replace(",", ".")
+        try:
+            value = float(raw)
+        except ValueError:
+            return None
+        return value if value > 0 else None
 
     def _normalize_polarity(self, value: str | None) -> str | None:
         if value is None:

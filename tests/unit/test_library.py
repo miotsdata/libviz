@@ -314,6 +314,32 @@ def test_save_as_db_flushes_engine(tmp_path):
     assert dest_path.exists()
 
 
+def test_save_as_db_creates_missing_parent_directories(tmp_path):
+    """save_as_db no longer goes through sqlite3's backup() API (it hangs
+    indefinitely on some network filesystems); the replacement plain-copy
+    path also creates the destination's parent directory, which a raw
+    sqlite3.connect() to a nonexistent directory could never do."""
+    src_path = tmp_path / "src.db"
+    dest_path = tmp_path / "nested" / "does" / "not" / "exist" / "dest.db"
+
+    loaded_library = Library.create(name="TestLib", path=src_path)
+    loaded_library.save_as_db(dest_path)
+
+    assert dest_path.exists()
+    assert loaded_library.path == dest_path
+
+
+def test_save_as_db_no_leftover_tmp_file(tmp_path):
+    """The copy-then-rename should leave no .tmp file behind."""
+    src_path = tmp_path / "src.db"
+    dest_path = tmp_path / "dest3.db"
+
+    loaded_library = Library.create(name="TestLib", path=src_path)
+    loaded_library.save_as_db(dest_path)
+
+    assert not dest_path.with_name(dest_path.name + ".tmp").exists()
+
+
 def test_load_from_db_returns_library(saved_library):
     loaded_library = Library.load_from_db(saved_library)
     assert isinstance(loaded_library, Library)
