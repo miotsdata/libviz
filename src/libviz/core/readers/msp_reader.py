@@ -17,8 +17,13 @@ POLARITY_MAP = {
 
 KNOWN_KEYS = {
     "NAME", "FORMULA", "INCHIKEY", "EXACTMASS",
-    "PRECURSORMZ", "PRECURSORTYPE", "IONMODE", "COLLISIONENERGY", "peaks"
+    "PRECURSORMZ", "PRECURSORTYPE", "IONMODE", "COLLISIONENERGY", "peaks",
+    "SMILES",
 }
+
+# Some exporters (e.g. MoNA) don't expose SMILES/PubChem CID as top-level
+# MSP keys; they bury them as quoted "key=value" segments inside COMMENT(S).
+_COMMENT_FIELD_RE = re.compile(r'"([^"]*)"')
 
 logger = logging.getLogger(__name__)
 
@@ -99,12 +104,15 @@ class MSPReader:
                 if "EXACTMASS" in entry
                 else calculate_exact_mass(entry.get("FORMULA"))
             )
+            smiles, pubchem_id = self._parse_smiles_and_pubchem(entry)
 
             compound_rows.append({
                 "name":       entry.get("NAME"),
                 "formula":    entry.get("FORMULA"),
                 "inchikey":   inchikey,
                 "exact_mass": exact_mass,
+                "smiles":     smiles,
+                "pubchem_id": pubchem_id,
             })
             self.compound_cache[inchikey] = None
 
@@ -134,9 +142,11 @@ class MSPReader:
         # 1. Bulk insert compounds
         if compound_rows:
             conn.exec_driver_sql(
-                "INSERT OR IGNORE INTO compound (name, formula, inchikey, exact_mass, added_on) "
-                "VALUES (?, ?, ?, ?, ?)",
-                [(r["name"], r["formula"], r["inchikey"], r["exact_mass"], now)
+                "INSERT OR IGNORE INTO compound "
+                "(name, formula, inchikey, exact_mass, smiles, pubchem_id, added_on) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [(r["name"], r["formula"], r["inchikey"], r["exact_mass"],
+                  r["smiles"], r["pubchem_id"], now)
                  for r in compound_rows]
             )
             inchikeys = tuple(r["inchikey"] for r in compound_rows)
@@ -230,6 +240,45 @@ class MSPReader:
         except ValueError:
             return None
         return value if value > 0 else None
+
+    def _parse_smiles_and_pubchem(self, entry: dict) -> tuple[str | None, int | None]:
+        """Extract SMILES / PubChem CID.
+
+        Most MSP exporters expose these as top-level keys. MoNA instead
+        buries them as quoted ``"key=value"`` segments inside COMMENT(S),
+        so fall back to parsing that field when the top-level key is
+        missing or blank.
+        """
+        smiles = (entry.get("SMILES") or "").strip() or None
+        pubchem_raw = entry.get("PUBCHEM") or entry.get("PUBCHEMID") or entry.get("PUBCHEM_CID")
+
+        if smiles is None or pubchem_raw is None:
+            comment = entry.get("COMMENTS") or entry.get("COMMENT") or ""
+            comment_fields = self._parse_comment_fields(comment)
+            if smiles is None:
+                smiles = comment_fields.get("smiles")
+            if pubchem_raw is None:
+                pubchem_raw = comment_fields.get("pubchem cid") or comment_fields.get("pubchem")
+
+        pubchem_id = None
+        if pubchem_raw is not None:
+            digits = str(pubchem_raw).strip()
+            if digits.isdigit():
+                pubchem_id = int(digits)
+
+        return smiles, pubchem_id
+
+    @staticmethod
+    def _parse_comment_fields(comment: str) -> dict[str, str]:
+        fields: dict[str, str] = {}
+        for segment in _COMMENT_FIELD_RE.findall(comment):
+            if "=" not in segment:
+                continue
+            key, value = segment.split("=", 1)
+            key = key.strip().lower()
+            if key not in fields:
+                fields[key] = value.strip()
+        return fields
 
     def _normalize_polarity(self, value: str | None) -> str | None:
         if value is None:

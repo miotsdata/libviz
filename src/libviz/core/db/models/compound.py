@@ -13,8 +13,8 @@ class Compound(Base):
     formula = Column(String, index=True)
     exact_mass = Column(Float, index=True)
     inchikey = Column(String, unique=True, nullable=False)
-    smiles = Column(String, index=True, unique=True)
-    pubchem_id = Column(Integer, index=True, unique=True)
+    smiles = Column(String, index=True)
+    pubchem_id = Column(Integer, index=True)
     added_on = Column(
         DateTime(timezone=True),
         default=datetime.now,

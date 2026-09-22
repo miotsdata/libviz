@@ -47,7 +47,9 @@ class TestCompound:
         with pytest.raises(IntegrityError):
             session.commit()
 
-    def test_unique_smiles(self, session):
+    def test_smiles_not_unique(self, session):
+        """Different compounds may legitimately share the same SMILES
+        (e.g. stereo-flattened duplicates), so this must NOT raise."""
         compound1 = Compound(
             name="Compound1",
             formula="C6H12O6",
@@ -68,10 +70,11 @@ class TestCompound:
         session.commit()
 
         session.add(compound2)
-        with pytest.raises(IntegrityError):
-            session.commit()
+        session.commit()
 
-    def test_unique_pubchem_id(self, session):
+    def test_pubchem_id_not_unique(self, session):
+        """Same PubChem CID can appear on multiple compound rows (e.g.
+        MSP entries with missing/duplicate metadata), so this must NOT raise."""
         compound1 = Compound(
             name="Compound1",
             formula="C6H12O6",
@@ -92,8 +95,7 @@ class TestCompound:
         session.commit()
 
         session.add(compound2)
-        with pytest.raises(IntegrityError):
-            session.commit()
+        session.commit()
 
     def test_name_case_insensitive_index(self, session):
         compound = Compound(
