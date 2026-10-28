@@ -49,7 +49,6 @@ class MSPReader:
         spectrum_rows: list[dict] = []
 
         for i, entry in enumerate(parse_msp(msp_path), start=1):
-            logger.debug("Processing entry %d", i)
             self._collect_entry(entry, compound_rows, spectrum_rows)
 
             if i % self.BATCH_SIZE == 0:
@@ -183,7 +182,6 @@ class MSPReader:
                 self._build_spectrum_tuple(row, now)
             )
             if cursor.rowcount == 0:
-                print("continued")
                 continue
             sid = cursor.lastrowid
             for k, v in row["_metadata"].items():

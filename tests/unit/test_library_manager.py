@@ -62,7 +62,7 @@ class TestCreateLibrary:
         mgr.create_library("TestLib", "/fake/lib.db")
 
         MockLibrary.create.assert_called_once_with(name="TestLib", path=Path("/fake/lib.db"))
-        assert mgr._libraries[lib.path] is lib
+        assert mgr._libraries[str(lib.path)] is lib
 
     @patch("libviz.core.managers.library_manager.Library")
     def test_accepts_path_object(self, MockLibrary):
@@ -102,38 +102,38 @@ class TestLoadLibraryFromMsp:
     @patch("libviz.core.managers.library_manager.Library")
     def test_loads_and_stores_library(self, MockLibrary):
         lib = make_mock_library()
-        MockLibrary.loadFromMSP.return_value = lib
+        MockLibrary.load_from_msp.return_value = lib
 
         mgr = LibraryManager()
         mgr.load_library_from_msp("/fake/lib.msp")
 
-        MockLibrary.loadFromMSP.assert_called_once_with(Path("/fake/lib.msp"))
-        assert mgr._libraries[lib.path] is lib
+        MockLibrary.load_from_msp.assert_called_once_with(Path("/fake/lib.msp"))
+        assert mgr._libraries[str(lib.path)] is lib
 
     @patch("libviz.core.managers.library_manager.Library")
     def test_accepts_path_object(self, MockLibrary):
         lib = make_mock_library()
-        MockLibrary.loadFromMSP.return_value = lib
+        MockLibrary.load_from_msp.return_value = lib
 
         mgr = LibraryManager()
         mgr.load_library_from_msp(Path("/fake/lib.msp"))
 
-        MockLibrary.loadFromMSP.assert_called_once_with(Path("/fake/lib.msp"))
+        MockLibrary.load_from_msp.assert_called_once_with(Path("/fake/lib.msp"))
 
     @patch("libviz.core.managers.library_manager.Library")
     def test_converts_string_to_path(self, MockLibrary):
         lib = make_mock_library()
-        MockLibrary.loadFromMSP.return_value = lib
+        MockLibrary.load_from_msp.return_value = lib
 
         mgr = LibraryManager()
         mgr.load_library_from_msp("/fake/lib.msp")
 
-        args, _ = MockLibrary.loadFromMSP.call_args
+        args, _ = MockLibrary.load_from_msp.call_args
         assert isinstance(args[0], Path)
 
     @patch("libviz.core.managers.library_manager.Library")
     def test_propagates_exceptions(self, MockLibrary):
-        MockLibrary.loadFromMSP.side_effect = FileNotFoundError("File not found")
+        MockLibrary.load_from_msp.side_effect = FileNotFoundError("File not found")
 
         mgr = LibraryManager()
         with pytest.raises(FileNotFoundError):
@@ -154,7 +154,7 @@ class TestLoadLibraryFromDb:
         mgr.load_library_from_db("/fake/lib.db")
 
         MockLibrary.load_from_db.assert_called_once_with(Path("/fake/lib.db"))
-        assert mgr._libraries[lib.path] is lib
+        assert mgr._libraries[str(lib.path)] is lib
 
     @patch("libviz.core.managers.library_manager.Library")
     def test_accepts_path_object(self, MockLibrary):
@@ -194,8 +194,8 @@ class TestSaveAsDb:
     def test_calls_save_on_selected_library(self):
         lib = make_mock_library()
         mgr = LibraryManager()
-        mgr._libraries[lib.path] = lib
-        mgr._selected_library = lib.path
+        mgr._libraries[str(lib.path)] = lib
+        mgr._selected_library = str(lib.path)
 
         mgr.save_as_db("/output/saved.db")
 
@@ -204,8 +204,8 @@ class TestSaveAsDb:
     def test_accepts_path_object(self):
         lib = make_mock_library()
         mgr = LibraryManager()
-        mgr._libraries[lib.path] = lib
-        mgr._selected_library = lib.path
+        mgr._libraries[str(lib.path)] = lib
+        mgr._selected_library = str(lib.path)
 
         mgr.save_as_db(Path("/output/saved.db"))
 
@@ -214,8 +214,8 @@ class TestSaveAsDb:
     def test_converts_string_to_path(self):
         lib = make_mock_library()
         mgr = LibraryManager()
-        mgr._libraries[lib.path] = lib
-        mgr._selected_library = lib.path
+        mgr._libraries[str(lib.path)] = lib
+        mgr._selected_library = str(lib.path)
 
         mgr.save_as_db("/output/saved.db")
 
@@ -240,8 +240,8 @@ class TestSelectedLibrary:
     def test_returns_correct_library_when_selected(self):
         lib = make_mock_library(Path("/fake/lib.db"))
         mgr = LibraryManager()
-        mgr._libraries[lib.path] = lib
-        mgr._selected_library = lib.path
+        mgr._libraries[str(lib.path)] = lib
+        mgr._selected_library = str(lib.path)
 
         assert mgr.selected_library() is lib
 
@@ -282,7 +282,7 @@ class TestHasLibraries:
     def test_true_when_library_present(self):
         lib = make_mock_library()
         mgr = LibraryManager()
-        mgr._libraries[lib.path] = lib
+        mgr._libraries[str(lib.path)] = lib
 
         assert mgr.has_libraries is True
 
@@ -300,8 +300,8 @@ class TestLibraryCount:
         lib_a = make_mock_library(Path("/fake/a.db"))
         lib_b = make_mock_library(Path("/fake/b.db"))
         mgr = LibraryManager()
-        mgr._libraries[lib_a.path] = lib_a
-        mgr._libraries[lib_b.path] = lib_b
+        mgr._libraries[str(lib_a.path)] = lib_a
+        mgr._libraries[str(lib_b.path)] = lib_b
 
         assert mgr.library_count == 2
 
@@ -313,20 +313,20 @@ class TestUnloadLibrary:
     def test_removes_library_by_string_path(self):
         lib = make_mock_library(Path("/fake/lib.db"))
         mgr = LibraryManager()
-        mgr._libraries[lib.path] = lib
+        mgr._libraries[str(lib.path)] = lib
 
         mgr.unload_library("/fake/lib.db")
 
-        assert lib.path not in mgr._libraries
+        assert str(lib.path) not in mgr._libraries
 
     def test_removes_library_by_path_object(self):
         lib = make_mock_library(Path("/fake/lib.db"))
         mgr = LibraryManager()
-        mgr._libraries[lib.path] = lib
+        mgr._libraries[str(lib.path)] = lib
 
         mgr.unload_library(Path("/fake/lib.db"))
 
-        assert lib.path not in mgr._libraries
+        assert str(lib.path) not in mgr._libraries
 
     def test_no_error_when_path_not_present(self):
         mgr = LibraryManager()
@@ -337,17 +337,17 @@ class TestUnloadLibrary:
         lib_a = make_mock_library(Path("/fake/a.db"))
         lib_b = make_mock_library(Path("/fake/b.db"))
         mgr = LibraryManager()
-        mgr._libraries[lib_a.path] = lib_a
-        mgr._libraries[lib_b.path] = lib_b
+        mgr._libraries[str(lib_a.path)] = lib_a
+        mgr._libraries[str(lib_b.path)] = lib_b
 
         mgr.unload_library("/fake/a.db")
 
-        assert lib_b.path in mgr._libraries
+        assert str(lib_b.path) in mgr._libraries
 
     def test_library_count_decrements(self):
         lib = make_mock_library(Path("/fake/lib.db"))
         mgr = LibraryManager()
-        mgr._libraries[lib.path] = lib
+        mgr._libraries[str(lib.path)] = lib
 
         mgr.unload_library("/fake/lib.db")
 
@@ -356,7 +356,7 @@ class TestUnloadLibrary:
     def test_has_libraries_false_after_unloading_last(self):
         lib = make_mock_library(Path("/fake/lib.db"))
         mgr = LibraryManager()
-        mgr._libraries[lib.path] = lib
+        mgr._libraries[str(lib.path)] = lib
 
         mgr.unload_library("/fake/lib.db")
 
@@ -457,3 +457,35 @@ class TestGetIdenticalSpectra:
 
         # Current implementation mutates in-place — document that it does
         assert "library_path" in original
+
+# ---------------------------------------------------------------------------
+# Key normalisation (str from QML vs Path from core)
+# ---------------------------------------------------------------------------
+
+class TestKeys:
+    def test_select_and_unload_with_mixed_path_types(self, tmp_path):
+        mgr = LibraryManager()
+        key = mgr.create_library("Lib", tmp_path / "lib.db")
+
+        mgr.select_library(str(tmp_path / "lib.db"))
+        assert mgr.selected_library_key == key
+
+        mgr.unload_library(str(tmp_path / "lib.db"))
+        assert mgr.library_count == 0
+        assert mgr.selected_library_key is None
+
+    def test_select_unknown_raises(self):
+        with pytest.raises(KeyError):
+            LibraryManager().select_library("/nope.db")
+
+    def test_save_rekeys_temp_library(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: [])
+        mgr = LibraryManager()
+        temp_key = mgr.load_library_from_msp(tmp_path / "x.msp")
+        temp_file = Path(temp_key)
+
+        new_key = mgr.save_as_db(tmp_path / "saved.db")
+
+        assert new_key == str((tmp_path / "saved.db").resolve())
+        assert list(mgr.libraries) == [new_key]
+        assert not temp_file.exists()  # temp DB cleaned up

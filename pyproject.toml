@@ -19,7 +19,9 @@ license = { text = "MIT" }
 
 # Optional extras
 [project.optional-dependencies]
-gui = ["pyside6>=6.10.2", "pyqt6>=6.10.2", "PySide6-Essentials>=6.10.2"]
+# Not the `pyside6` meta-package: it pulls WebEngine, which the GUI does not
+# use. Qt Graphs (spectrum plots) lives in Addons and needs >= 6.12 (zoom/pan).
+gui = ["pyside6-essentials>=6.12.0", "pyside6-addons>=6.12.0"]
 all = ["libviz[gui]"]
 
 [build-system]
@@ -38,7 +40,8 @@ excludes = ["src/libviz/old", "tests", "**/.DS_Store"]
 dev = [
     "pytest>=9.0.2",
     "pylint>=4.0.4",
-    "pyside6-stubs>=6.7.3.0",
     "hupper>=1.12.1",
     "pyinstaller>=6.19.0",
+    "pytest-qt>=4.5.0",
+    "archunitpython>=1.8.1",
 ]

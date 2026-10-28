@@ -1,8 +1,10 @@
+from contextlib import contextmanager
 from pathlib import Path
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import sessionmaker
 import numpy as np
 import logging
+import os
 import shutil
 import tempfile
 
@@ -16,12 +18,12 @@ from libviz.core.db.models import (
     AdductType,
     populate_adduct_types
 )
-from libviz.core.utils.mass_calulation_utils import calculate_exact_mass
+from libviz.core.utils.mass_utils import calculate_exact_mass
 
 logger = logging.getLogger(__name__)
 
 class Library:
-    def __init__(self, name: str, path: Path):
+    def __init__(self, name: str, path: Path, *, fast_writes: bool = False):
 
         # Checks
         if not isinstance(path, (str, Path)):
@@ -33,29 +35,38 @@ class Library:
         if not name:
             raise ValueError("Name cannot be an empty string.")
 
-        self.path: Path = path
+        self.path: Path = Path(path)
         self.is_temp: bool = True
         self.name: str = name
+        self._open_engine(fast_writes)
+
+    def _open_engine(self, fast_writes: bool):
+        """(Re)open the engine on ``self.path``.
+
+        ``fast_writes`` turns off the rollback journal and fsync — only for
+        the disposable temp DB a bulk import writes into, never for a library
+        the user keeps (a crash there would corrupt it, see ADR 1). No WAL
+        either: libraries live on network shares, where WAL is unsafe.
+        """
         self.engine: Engine = create_engine(f"sqlite:///{self.path}", future=True)
         self.session_maker = sessionmaker(bind=self.engine, future=True)
-        self._n_compounds = 0
-        self._n_spectra = 0
 
         @event.listens_for(self.engine, "connect")
-        def enable_sqlite_fk(dbapi_connection, connection_record):
+        def _pragmas(dbapi_connection, connection_record):
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.execute("PRAGMA journal_mode=MEMORY")
-            cursor.execute("PRAGMA synchronous=OFF")
+            if fast_writes:
+                cursor.execute("PRAGMA journal_mode=MEMORY")
+                cursor.execute("PRAGMA synchronous=OFF")
             cursor.close()
 
 
     @classmethod
-    def create(cls, path: Path, name: str):
+    def create(cls, path: Path, name: str, *, fast_writes: bool = False):
 
         logger.debug("Creating new library with name %s at path %s", name, path)
 
-        lib = cls(name = name, path=path)
+        lib = cls(name=name, path=path, fast_writes=fast_writes)
 
         if path.exists():
             raise FileExistsError(f"Library already exists at path {str(path)}")
@@ -75,24 +86,23 @@ class Library:
 
 
     # ---------- session handling ----------
+    @contextmanager
     def session_scope(self):
-        class _SessionContext:
-            def __init__(self, lib):
-                self.lib = lib
-                self.session = None
+        session = self.session_maker()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
-            def __enter__(self):
-                self.session = self.lib.session_maker()
-                return self.session
-
-            def __exit__(self, exc_type, exc, tb):
-                if exc:
-                    self.session.rollback()
-                else:
-                    self.session.commit()
-                self.session.close()
-
-        return _SessionContext(self)
+    def close(self):
+        """Release the DB; a temp (unsaved) library's file is deleted."""
+        self.engine.dispose()
+        if self.is_temp:
+            self.path.unlink(missing_ok=True)
 
 
     # ---------- Saving ----------
@@ -105,18 +115,14 @@ class Library:
         if self.name == "NONAME":
             raise ValueError("Name cannot be NONAME. Please rename the library with the rename method.")
 
-        # ensure WAL is flushed into the main db file
-        with self.engine.connect() as conn:
-            conn.exec_driver_sql("PRAGMA wal_checkpoint(FULL);")
-
-        # close all pooled connections -- self.path is now a complete,
-        # consistent, single-file snapshot with nothing else holding it open
+        # close all pooled connections -- every session has committed, so
+        # self.path is now a complete, consistent, single-file snapshot
         self.engine.dispose()
 
         # A plain file copy rather than sqlite3's backup() API: backup()
         # needs a real file lock on the destination, which some network
         # filesystems (SMB/CIFS) don't honour -- the call can then hang
-        # indefinitely instead of erroring. The checkpoint above already
+        # indefinitely instead of erroring. The dispose above already
         # makes self.path a complete, static file, so a straight sequential
         # copy is correct and safe everywhere. Copy-then-rename keeps the
         # write atomic -- a crash mid-copy never leaves a partial `path`.
@@ -125,38 +131,37 @@ class Library:
         shutil.copy2(self.path, tmp_path)
         tmp_path.replace(path)
 
+        old_path, was_temp = self.path, self.is_temp
         self.path = Path(path)
         self.is_temp = False
+        # Later edits must go to the saved file, with safe pragmas.
+        self._open_engine(fast_writes=False)
+        if was_temp and old_path != self.path:
+            old_path.unlink(missing_ok=True)
         logger.debug("Saved library to %s", path)
 
 
     # ---------- Loading ----------
     @classmethod
-    def loadFromMSP(cls, msp_path: Path, default_precursor_type: str = "[M+H]+"):
-
+    def load_from_msp(cls, msp_path: Path, default_precursor_type: str = "[M+H]+"):
+        """Import an MSP file into a new temp library (``is_temp``)."""
         logger.debug("Loading library from MSP file %s", msp_path)
 
-        tmp_file = tempfile.NamedTemporaryFile(
-            suffix=".db",
-            delete=True
-        )
-        tmp_file.close()
+        fd, tmp_name = tempfile.mkstemp(suffix=".db", prefix="libviz_")
+        os.close(fd)
+        db_path = Path(tmp_name)
+        db_path.unlink()  # create() refuses an existing file
 
-        db_path = Path(tmp_file.name)
-
-        lib = cls.create(name="In-memory MSP Library", path=db_path)
+        lib = cls.create(name=Path(msp_path).stem or "MSP library", path=db_path, fast_writes=True)
 
         with lib.session_scope() as session:
-
             reader = MSPReader(session, default_precursor_type=default_precursor_type)
             reader.import_file(msp_path)
 
-            lib._n_compounds = session.query(Compound).count()
-            lib._n_spectra = session.query(Spectrum).count()
-
         lib.is_temp = True
 
-        logger.debug("Loaded library from MSP file %s with %d compounds and %d spectra", msp_path, lib._n_compounds, lib._n_spectra)
+        logger.debug("Loaded library from MSP file %s with %d compounds and %d spectra",
+                     msp_path, lib.n_compounds, lib.n_spectra)
 
         return lib
 
@@ -169,23 +174,16 @@ class Library:
         if not Path(path).exists():
             raise FileNotFoundError(path)
 
-        # We need the library name from the metadata
-        engine = create_engine(f"sqlite:///{path}", future=True)
-        session_made = sessionmaker(bind=engine, future=True)
-        with session_made() as session:
+        lib = cls(name="unnamed", path=path)
+        with lib.session_scope() as session:
             meta = session.query(LibraryMetadata).first()
             if meta is None:
+                lib.engine.dispose()
                 raise ValueError(f"No metadata found in library at {path}")
-            name = meta.name
-
-        # Create instance
-        lib = cls(name=name, path=Path(path))
-        session = lib.session_maker()
-        lib._n_compounds = session.query(Compound).count()
-        lib._n_spectra = session.query(Spectrum).count()
+            lib.name = meta.name
         lib.is_temp = False
         return lib
-    
+
     # ---------- Setters ----------
     def rename_library(self, new_name: str):
         logger.debug("Renaming library from %s to %s", self.name, new_name)
@@ -215,12 +213,14 @@ class Library:
             return adduct.delta_mass
 
     @property
-    def n_compounds(self):
-        return self._n_compounds
-    
+    def n_compounds(self) -> int:
+        with self.session_scope() as session:
+            return session.query(Compound).count()
+
     @property
-    def n_spectra(self):
-        return self._n_spectra
+    def n_spectra(self) -> int:
+        with self.session_scope() as session:
+            return session.query(Spectrum).count()
 
     def _get_or_insert_compound_by_inchikey(self, session,  name: str, formula: str, inchikey: str) -> Compound:
 
@@ -288,35 +288,6 @@ class Library:
             session.add(spectrum)
 
 
-    def find_identical_spectra(self, precursor_mz: float, polarity: str, hash_ref: str,
-                               ppm_tolerance: float = 5):
-        if precursor_mz <= 0:
-            raise ValueError("precursor_mz must be a positive number")
-
-        if polarity not in ("POSITIVE", "NEGATIVE"):
-            raise ValueError("polarity must be either 'POSITIVE' or 'NEGATIVE'")
-
-        if not isinstance(hash_ref, str) or not hash_ref:
-            raise ValueError("hash_ref must be a non-empty string")
-
-        if ppm_tolerance < 0:
-            raise ValueError("ppm_tolerance must be a non-negative number")
-
-        matches = []
-        with self.session_scope() as session:
-            candidates = session.query(Spectrum).filter_by(
-                polarity=polarity,
-                spectrum_hash=hash_ref
-            ).all()
-
-            for spectrum in candidates:
-                ppm_diff = abs(spectrum.precursor_mz - precursor_mz) / precursor_mz * 1e6
-                if ppm_diff <= ppm_tolerance:
-                    matches.append(spectrum.id)
-
-            return matches
-
-
     def get_compound_id_from_spectrum_id(self, spectrum_id: int):
         with self.session_scope() as session:
             spectrum = session.query(Spectrum).filter_by(id=spectrum_id).one_or_none()
@@ -328,43 +299,21 @@ class Library:
     def get_identical_spectra_compounds_by_spectrum_id(self,
                                                        spectrum_id: int,
                                                        ppm_tolerance: float = 5):
-
+        """Other spectra identical to ``spectrum_id`` (same hash, polarity,
+        precursor within ppm), with their compound."""
         if not isinstance(spectrum_id, int):
             raise ValueError("spectrum_id must be an integer")
-
-        if not isinstance(ppm_tolerance, (int, float)):
-            raise ValueError("ppm_tolerance must be a number")
-
-        if ppm_tolerance < 0:
-            raise ValueError("ppm_tolerance must be a non-negative number")
 
         with self.session_scope() as session:
             spectrum = session.query(Spectrum).filter_by(id=spectrum_id).one_or_none()
             if spectrum is None:
                 raise ValueError(f"Spectrum with ID {spectrum_id} not found")
+            ref = (spectrum.precursor_mz, spectrum.polarity, spectrum.spectrum_hash)
 
-            candidates = (
-                session.query(Spectrum, Compound)
-                .join(Compound, Compound.id == Spectrum.compound_id)
-                .filter(
-                    Spectrum.polarity == spectrum.polarity,
-                    Spectrum.spectrum_hash == spectrum.spectrum_hash,
-                    Spectrum.id != spectrum_id
-                )
-                .all()
-            )
-
-            compounds = []
-            for candidate_spectrum, comp in candidates:
-                ppm_diff = abs(candidate_spectrum.precursor_mz - spectrum.precursor_mz) / spectrum.precursor_mz * 1e6
-                if ppm_diff <= ppm_tolerance:
-                    compounds.append({"id": comp.id,
-                                      "name": comp.name,
-                                      "formula": comp.formula, 
-                                      "inchikey": comp.inchikey, 
-                                      "spectrum_id": candidate_spectrum.id})
-
-            return compounds
+        return [
+            c for c in self.get_identical_spectra_compounds_by_spectrum_info(*ref, ppm_tolerance=ppm_tolerance)
+            if c["spectrum_id"] != spectrum_id
+        ]
 
 
     def get_identical_spectra_compounds_by_spectrum_info(self,

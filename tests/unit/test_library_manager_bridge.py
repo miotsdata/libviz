@@ -238,7 +238,7 @@ class TestSelectLibrary:
 
         bridge.selectLibrary("/path/to/lib")
 
-        assert mock_manager._selected_library == "/path/to/lib"
+        mock_manager.select_library.assert_called_once_with("/path/to/lib")
         assert len(received["selectedLibraryChanged"]) == 1
 
 

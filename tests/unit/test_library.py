@@ -65,7 +65,7 @@ def saved_library(tmp_path, monkeypatch) -> Path:
 
     monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: fake_entries)
 
-    loaded_library = Library.loadFromMSP(Path("dummy.msp"))
+    loaded_library = Library.load_from_msp(Path("dummy.msp"))
     db_path = Path(tmp_path / "test.db")
     loaded_library.save_as_db(db_path)
 
@@ -82,7 +82,7 @@ def empty_library(tmp_path, monkeypatch):
     monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: [])
 
     db_path = tmp_path / "empty.db"
-    loaded_library = Library.loadFromMSP(Path("dummy.msp"))
+    loaded_library = Library.load_from_msp(Path("dummy.msp"))
     loaded_library.save_as_db(db_path)
 
     return db_path
@@ -195,8 +195,6 @@ def test_library_init(tmp_path):
     assert loaded_library.name == "TestLib"
     assert loaded_library.path == lib_path
     assert loaded_library.is_temp is True
-    assert loaded_library.n_compounds == 0
-    assert loaded_library.n_spectra == 0
     assert loaded_library.engine is not None
     assert callable(loaded_library.session_maker)
 
@@ -358,7 +356,7 @@ def test_load_from_db_counts(saved_library):
 
 def test_load_from_db_name(saved_library):
     loaded_library = Library.load_from_db(saved_library)
-    assert loaded_library.name == "In-memory MSP Library"
+    assert loaded_library.name == "dummy"
 
 
 def test_load_from_db_path(saved_library):
@@ -791,3 +789,37 @@ class TestGetIdenticalSpectraCompoundsBySpectrumInfo:
                 known_spectrum["hash"],
                 ppm_tolerance=-1.0,
             )
+
+# ---- durability (ADR 1) ----
+
+def _pragma(lib, name):
+    with lib.engine.connect() as conn:
+        return conn.exec_driver_sql(f"PRAGMA {name}").scalar()
+
+
+def test_saved_library_uses_safe_pragmas(saved_library):
+    lib = Library.load_from_db(saved_library)
+    assert _pragma(lib, "journal_mode") == "delete"
+    assert _pragma(lib, "synchronous") == 2  # FULL
+    assert _pragma(lib, "foreign_keys") == 1
+
+
+def test_temp_import_library_uses_fast_pragmas(tmp_path, monkeypatch):
+    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: [])
+    lib = Library.load_from_msp(Path("dummy.msp"))
+    assert _pragma(lib, "synchronous") == 0
+    lib.close()
+    assert not lib.path.exists()
+
+
+def test_edits_after_save_go_to_saved_file(tmp_path, monkeypatch):
+    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: [])
+    lib = Library.load_from_msp(Path("dummy.msp"))
+    temp_path = lib.path
+    lib.save_as_db(tmp_path / "out.db")
+    adduct_id = lib.get_adducts()[0]["id"]
+    lib.add_spectra("c", "C6H6", "KEY", _spectra_info(79.0), adduct_id)
+
+    assert not temp_path.exists()
+    assert Library.load_from_db(tmp_path / "out.db").n_spectra == 1
+    assert _pragma(lib, "synchronous") == 2

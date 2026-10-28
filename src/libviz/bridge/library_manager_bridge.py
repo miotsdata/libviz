@@ -131,7 +131,7 @@ class LibraryManagerBridge(QObject):
 
     @Slot(str)
     def selectLibrary(self, path: str):
-        self._manager._selected_library = path
+        self._manager.select_library(path)
         self.selectedLibraryChanged.emit()
 
     # --- Properties ---
