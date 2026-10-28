@@ -115,3 +115,29 @@ def test_merge_dedupes_spectra_without_polarity(tmp_path):
     target = Library.create(tmp_path / "t.db", name="T")
     assert target.merge_from(a.path)["spectra_added"] == 1
     assert target.merge_from(a.path)["spectra_added"] == 0
+
+
+def test_msp_import_skips_bad_entries_and_summarises(tmp_path):
+    def entry(name, inchikey="", mz="100.1", adduct="[M+H]+", peaks="50 10"):
+        lines = [f"NAME: {name}", f"PRECURSORMZ: {mz}", f"PRECURSORTYPE: {adduct}"]
+        if inchikey:
+            lines.append(f"INCHIKEY: {inchikey}")
+        return "\n".join(lines + ["Num Peaks: 1", peaks])
+    msp = tmp_path / "in.msp"
+    msp.write_text("\n\n".join([
+        entry("ok", "AAAAAAAAAAAAAA-BBBBBBBBBB-N"),
+        entry("ok2", "CCCCCCCCCCCCCC-DDDDDDDDDD-N", peaks="60 5"),
+        entry("dup", "AAAAAAAAAAAAAA-BBBBBBBBBB-N"),
+        entry("no key"),
+        entry("no key 2"),
+        entry("bad mz", "EEEEEEEEEEEEEE-FFFFFFFFFF-N", mz="abc"),
+        entry("bad adduct", "GGGGGGGGGGGGGG-HHHHHHHHHH-N", adduct="[M+Xx]+"),
+    ]) + "\n")
+
+    lib = Library.load_from_msp(msp)
+
+    assert lib.n_spectra == 2
+    assert lib.import_summary == (
+        "7 entries, 2 imported, 5 skipped (no InChIKey: 2, duplicate spectrum: 1, "
+        "missing/invalid precursor m/z: 1, unknown adduct: 1)")
+    lib.close()

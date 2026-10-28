@@ -10,7 +10,7 @@ to close it.
 |---|---|---|
 | New empty library | File › New library… (Ctrl+N) | Created at the chosen path. |
 | Open a library | File › Open library… (Ctrl+O), File › Open recent | |
-| Import an MSP file | File › Import MSP… (Ctrl+I) | The import is **unsaved** until you use *Save as*. |
+| Import an MSP file | File › Import MSP… (Ctrl+I) | The import is **unsaved** until you use *Save as*. A summary shows how many entries were imported and why the rest were skipped (no InChIKey, bad precursor m/z, unknown adduct, duplicate). |
 | Save as | File › Save as… (Ctrl+Shift+S) | Copies the library to a new `.db`; later edits go there. |
 | Rename | Library › Rename… | The name is stored inside the file. |
 | Export as MSP | File › Export as MSP… (Ctrl+E) | Every spectrum, with its metadata. |

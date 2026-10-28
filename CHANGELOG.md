@@ -8,10 +8,11 @@
 - Temp MSP-import databases are deleted when the library is saved or closed.
 - Selecting/unloading a library from the GUI could silently fail (str vs Path keys).
 - Library counts were stale after adding spectra.
+- MSP import inserted a repeated spectrum twice when it had no IONMODE.
 
 ### Added
 - New desktop GUI shell (ADR 2): menubar, sidebar of open libraries, status bar with progress, light/dark theme, recent libraries, unsaved-library and quit confirmations. Launch with `libviz-gui`.
-- MSP import reports progress.
+- MSP import reports progress and ends with a summary ("X entries, Y imported, Z skipped" with the reasons: no InChIKey, bad precursor m/z, unknown adduct, duplicate). Skipped entries are also logged as warnings.
 - Library inspector (ADR 3): search by name/formula/InChIKey or mass ± ppm, polarity/adduct/CE filters, sortable paged compound table that stays fast on 500k-spectrum libraries, spectra list, interactive spectrum plot, compound identifiers and spectrum metadata, copy peaks.
 - **Build library spectra from mzML** (ADR 4): target list (CSV/TSV) + DDA/DIA/imaging mzML files → one spectrum per compound/adduct/CE, reviewed and picked in the GUI (mirror-plot comparison) or chosen automatically by `libviz build`; provenance stored as spectrum metadata; skip/replace existing spectra.
 - Fast streaming mzML reader (`core/readers/mzml_reader.py`), no new dependency.

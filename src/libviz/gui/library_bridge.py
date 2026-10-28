@@ -154,7 +154,11 @@ class LibraryBridge(QObject):
         def load(progress):
             lib = Library.load_from_msp(path, progress=progress)
             return lib, describe(lib)
-        self._run(f"Importing {path.name}", load, on_success=self._opened, progress=True)
+
+        def imported(result):
+            self._opened(result)
+            self.infoMessage.emit(f"Imported {path.name}: {result[0].import_summary}.")
+        self._run(f"Importing {path.name}", load, on_success=imported, progress=True)
 
     @Slot(str, str)
     def createLibrary(self, url: str, name: str):

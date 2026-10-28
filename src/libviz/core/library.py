@@ -23,6 +23,14 @@ from libviz.core.utils.mass_utils import calculate_exact_mass
 
 logger = logging.getLogger(__name__)
 
+def import_summary(n_entries: int, imported: int, reasons) -> str:
+    """e.g. "120 entries, 117 imported, 3 skipped (no InChIKey: 2, unknown adduct: 1)"."""
+    text = f"{n_entries} entries, {imported} imported, {n_entries - imported} skipped"
+    if reasons:
+        text += " (" + ", ".join(f"{r}: {n}" for r, n in reasons.most_common()) + ")"
+    return text
+
+
 class Library:
     def __init__(self, name: str, path: Path, *, fast_writes: bool = False):
 
@@ -38,6 +46,7 @@ class Library:
 
         self.path: Path = Path(path)
         self.is_temp: bool = True
+        self.import_summary: str = ""  # set by load_from_msp
         self.name: str = name
         self._open_engine(fast_writes)
 
@@ -157,9 +166,11 @@ class Library:
 
         with lib.session_scope() as session:
             reader = MSPReader(session, default_precursor_type=default_precursor_type)
-            reader.import_file(msp_path, progress)
+            n_entries, reasons = reader.import_file(msp_path, progress)
 
         lib.is_temp = True
+        lib.import_summary = import_summary(n_entries, lib.n_spectra, reasons)
+        logger.info(lib.import_summary)
 
         logger.debug("Loaded library from MSP file %s with %d compounds and %d spectra",
                      msp_path, lib.n_compounds, lib.n_spectra)

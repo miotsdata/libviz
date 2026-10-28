@@ -34,6 +34,7 @@ def cmd_convert(args) -> int:
     lib = Library.load_from_msp(args.msp, default_precursor_type=args.default_adduct,
                                 progress=_progress("Importing"))
     print(file=sys.stderr)
+    print(lib.import_summary, file=sys.stderr)
     if args.name:
         lib.rename_library(args.name)
     lib.save_as_db(out)

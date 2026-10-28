@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 import numpy as np
 import re
+from collections import Counter
 from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session
@@ -37,9 +38,15 @@ class MSPReader:
         self.adduct_cache: dict[str, int] = {}
         self.compound_cache: dict[str, int] = {}
         self.default_precursor_type: str = default_precursor_type
+        self.n_entries = 0
+        self.skipped: Counter[str] = Counter()  # reason -> entries dropped
+        # uq_spectrum_identity lets NULL-polarity duplicates through, so dedupe here.
+        self._seen: set[tuple] = set()
 
     # ---------- public API ----------
-    def import_file(self, msp_path: Path, progress=None):
+    def import_file(self, msp_path: Path, progress=None) -> tuple[int, Counter]:
+        """Import every valid entry; bad ones are skipped with a warning.
+        Returns (entries read, skip reasons)."""
         if not isinstance(msp_path, Path):
             raise TypeError(f"Msp_path should be a Path object. Found {type(msp_path).__name__}")
 
@@ -49,6 +56,7 @@ class MSPReader:
         spectrum_rows: list[dict] = []
 
         for i, entry in enumerate(parse_msp(msp_path, progress), start=1):
+            self.n_entries = i
             self._collect_entry(entry, compound_rows, spectrum_rows)
 
             if i % self.BATCH_SIZE == 0:
@@ -59,6 +67,7 @@ class MSPReader:
         self._flush(compound_rows, spectrum_rows)
         self.session.commit()
         logger.debug("Import complete.")
+        return self.n_entries, self.skipped
 
     # ---------- collect ----------
     def _collect_entry(self, entry, compound_rows, spectrum_rows):
@@ -68,6 +77,14 @@ class MSPReader:
                 "Skipping entry with missing/invalid PRECURSORMZ: %r",
                 entry.get("PRECURSORMZ") or entry.get("PRECURSOR_MZ"),
             )
+            self.skipped["missing/invalid precursor m/z"] += 1
+            return
+
+        inchikey = entry.get("INCHIKEY", "").strip().upper() or None
+        if inchikey is None:
+            # Compounds are keyed by InChIKey; without one the spectrum has no compound.
+            logger.warning("Skipping entry without INCHIKEY: %r", entry.get("NAME"))
+            self.skipped["no InChIKey"] += 1
             return
 
         formula = entry.get("PRECURSORTYPE") or entry.get("PRECURSOR_TYPE")
@@ -82,6 +99,7 @@ class MSPReader:
                 charge, delta, multiplication_factor = infer_precursor_delta(formula)
             except (ValueError, PyteomicsError):
                 logger.warning("Skipping unknown precursor type: %s", formula)
+                self.skipped["unknown adduct"] += 1
                 return
 
             conn.exec_driver_sql(
@@ -95,7 +113,6 @@ class MSPReader:
             self.adduct_cache[formula] = row[0]
 
         adduct_id = self.adduct_cache[formula]
-        inchikey = entry.get("INCHIKEY", "").strip().upper() or None
 
         if inchikey not in self.compound_cache:
             exact_mass = (
@@ -117,6 +134,14 @@ class MSPReader:
 
         mz, intensity = self._prepare_peaks(entry)
         spectrum_hash = calculate_spectrum_hash(mz, intensity)
+        polarity = self._normalize_polarity(entry.get("IONMODE") or entry.get("ION_MODE"))
+        ce = parse_collision_energy(entry.get("COLLISIONENERGY") or entry.get("COLLISION_ENERGY"))
+        identity = (inchikey, adduct_id, polarity, ce, spectrum_hash)
+        if identity in self._seen:
+            logger.warning("Skipping duplicate spectrum of %r", entry.get("NAME"))
+            self.skipped["duplicate spectrum"] += 1
+            return
+        self._seen.add(identity)
         extra = {k: v for k, v in entry.items() if k not in KNOWN_KEYS}
 
         spectrum_rows.append({
@@ -126,7 +151,8 @@ class MSPReader:
             "_mz":           mz,
             "_intensity":    intensity,
             "_hash":         spectrum_hash,
-            "_entry":        entry,
+            "_polarity":     polarity,
+            "_ce":           ce,
             "_metadata":     extra,
         })
 
@@ -198,13 +224,12 @@ class MSPReader:
 
     # ---------- helpers ----------
     def _build_spectrum_tuple(self, row, now: str) -> tuple:
-        entry = row["_entry"]
         return (
             self.compound_cache[row["_inchikey"]],
             row["_precursor_mz"],
             row["_adduct_id"],
-            self._normalize_polarity(entry.get("IONMODE") or entry.get("ION_MODE")),
-            parse_collision_energy(entry.get("COLLISIONENERGY") or entry.get("COLLISION_ENERGY")),
+            row["_polarity"],
+            row["_ce"],
             row["_hash"],
             row["_mz"].tobytes(),
             row["_intensity"].tobytes(),
