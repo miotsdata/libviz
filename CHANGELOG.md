@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- *Peaks…* button on the spectrum: a sortable table of the peaks (m/z, intensity, relative %).
+
+### Fixed
+- Spectrum plots have a white plot area and a light grid in both themes, as in MSIAnalyzer (the dark theme had made them dark).
+
 ## 0.2.0 — 2026-10-28
 
 ### Fixed

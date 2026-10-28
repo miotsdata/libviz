@@ -1,3 +1,4 @@
+import pytest
 import os
 import subprocess
 import sys
@@ -62,3 +63,29 @@ def test_smoke_test_mode_exits_cleanly(tmp_path):
                          capture_output=True, text=True, timeout=120)
     assert run.returncode == 0, run.stderr[-2000:]
     assert "LIBVIZ_SMOKE_TEST ok" in run.stdout
+
+
+def test_peaks_dialog_lists_and_sorts_the_selected_spectrum(qtbot, msp_file):
+    bridges = make_bridges()
+    engine = build_engine(bridges)
+    window = engine.rootObjects()[0]
+    libs, insp = bridges["Libraries"], bridges["Inspector"]
+    with qtbot.waitSignal(libs.libraryOpened, timeout=10_000):
+        libs.importMsp(str(msp_file))
+    qtbot.waitUntil(lambda: insp.compounds.rowCount() > 0)
+    with qtbot.waitSignal(insp.spectrumChanged, timeout=10_000):
+        insp.selectCompoundRow(0)
+    qtbot.waitUntil(lambda: bool(insp.spectrum.get("mz")))
+
+    dialog = window.findChild(QObject, "peaksDialog")
+    dialog.open()
+    qtbot.waitUntil(lambda: dialog.property("opened"))
+    spectrum = insp.spectrum
+    rows = dialog.property("rows").toVariant()
+    assert [r[0] for r in rows] == pytest.approx(sorted(spectrum["mz"]))
+    assert max(r[2] for r in rows) == pytest.approx(100)
+
+    dialog.setProperty("sortColumn", 1)
+    dialog.setProperty("ascending", False)
+    intensities = [r[1] for r in dialog.property("rows").toVariant()]
+    assert intensities == sorted(intensities, reverse=True)

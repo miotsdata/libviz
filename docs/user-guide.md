@@ -35,7 +35,9 @@ discarding it.
     of peaks).
   - The spectrum plot: mouse wheel zooms m/z, drag pans, double-click
     resets, hover shows a peak's values. *Copy peaks* copies
-    `m/z<TAB>intensity` lines.
+    `m/z<TAB>intensity` lines. *Peaks…* opens a table of every peak (m/z,
+    intensity, % of the base peak); click a column header to sort. It stays
+    open and follows the selected spectrum.
   - Compound identifiers (InChIKey, SMILES, PubChem link) and every metadata
     field stored with the spectrum.
 

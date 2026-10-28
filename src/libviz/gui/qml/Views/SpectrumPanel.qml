@@ -143,6 +143,12 @@ SplitView {
                         + "  ·  " + (root.spectrum.mz ? root.spectrum.mz.length : 0) + qsTr(" peaks") : ""
             }
             ToolButton { text: qsTr("Search similar"); onClicked: root.searchSimilarRequested() }
+            ToolButton {
+                objectName: "showPeaksButton"
+                text: qsTr("Peaks…")
+                enabled: !!root.spectrum.mz && root.spectrum.mz.length > 0
+                onClicked: peaksDialog.open()
+            }
             ToolButton { text: qsTr("Copy peaks"); onClicked: Inspector.copyPeaks() }
         }
         RowLayout {
@@ -177,6 +183,11 @@ SplitView {
                 yTickInterval: root.comparing ? 500 : 0
             }
         }
+    }
+
+    PeaksDialog {
+        id: peaksDialog
+        spectrum: root.spectrum
     }
 
     // --- details ---
