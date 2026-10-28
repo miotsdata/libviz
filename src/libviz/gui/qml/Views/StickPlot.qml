@@ -177,7 +177,9 @@ Item {
             tickAnchor: 0
             // Mirror plot: "1.0 0.5 0 0.5 1.0" — both halves read as
             // positive intensities.
-            labelDelegate: plot.mirrored ? mirroredLabel : null
+            // Always our delegate: Qt Graphs doesn't rebuild labels when
+            // labelDelegate changes after creation (mirrored toggles live).
+            labelDelegate: mirroredLabel
             // y only rescales (_fitY); the wheel/drag act on m/z alone.
             onZoomChanged: if (zoom !== 1) zoom = 1
             onPanChanged: if (pan !== 0) pan = 0
@@ -210,7 +212,7 @@ Item {
                 id: mirroredLabelText
                 anchors.centerIn: parent
                 color: Theme.textColor
-                text: parent.text.replace("-", "")
+                text: plot.mirrored ? parent.text.replace("-", "") : parent.text
             }
         }
     }

@@ -56,3 +56,14 @@ def calculate_exact_mass_formula_adduct(formula: str, delta: float, n_decimals: 
         return round(calculate_mass(formula=formula) + delta, n_decimals)
     except PyteomicsError as e:
         raise e
+
+
+ELECTRON = 0.000548579909065
+
+
+def adduct_mz(neutral_mass: float, adduct: str) -> float:
+    """m/z of ``adduct`` (e.g. "[M+H]+", "[2M+Na]+", "[M-2H]2-") of a
+    neutral monoisotopic mass. ``infer_precursor_delta`` sums *atom*
+    masses, so the ion's missing/extra electrons are corrected here."""
+    charge, delta, multiplier = infer_precursor_delta(adduct)
+    return (multiplier * neutral_mass + delta - charge * ELECTRON) / abs(charge)

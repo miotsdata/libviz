@@ -2,6 +2,7 @@
 
 Build, inspect and curate MS/MS spectral libraries.
 
+- **Build** libraries from mzML files (DDA, DIA, imaging) and a target list: one spectrum per compound/adduct/CE, you pick the best scan.
 - **Import** MSP libraries (MoNA, MS-DIAL, NIST-style exports).
 - **Inspect** libraries: browse compounds and spectra, view spectra.
 
@@ -10,6 +11,7 @@ Build, inspect and curate MS/MS spectral libraries.
 ```bash
 pdm install -G gui          # or: pip install "libviz[gui]"
 pdm run libviz-gui
+pdm run libviz build targets.csv run.mzML -o standards.db   # headless
 ```
 
 Python 3.13, PySide6 ≥ 6.12.

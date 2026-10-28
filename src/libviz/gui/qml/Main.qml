@@ -53,10 +53,14 @@ ApplicationWindow {
     Component.onCompleted: Theme.isDark = settings.isDark
 
     readonly property bool hasSelection: Libraries.selectedKey !== ""
+    property bool showBuilder: false
+    // "New library…" from the builder's commit dialog: commit once it's created.
+    property bool commitAfterCreate: false
     // Pages call these to drive the shared dialogs.
     function openLibraryDialog() { openDbDialog.open() }
     function importMspDialog() { mspDialog.open() }
     function newLibraryDialog() { newDbDialog.open() }
+    function openBuilder() { showBuilder = true }
 
     function addRecent(path) {
         var list = settings.recentLibraries.filter(function (p) { return p !== path })
@@ -111,6 +115,8 @@ ApplicationWindow {
         }
         Menu {
             title: qsTr("&Library")
+            Action { text: qsTr("&Build from mzML…"); shortcut: "Ctrl+B"; onTriggered: window.openBuilder() }
+            MenuSeparator {}
             Action { text: qsTr("&Rename…"); enabled: window.hasSelection && !Libraries.busy; onTriggered: renameDialog.openWith(Libraries.selected.name) }
         }
         Menu {
@@ -137,8 +143,18 @@ ApplicationWindow {
         }
 
         Loader {
+            id: contentLoader
             SplitView.fillWidth: true
-            sourceComponent: window.hasSelection ? libraryPage : welcomePage
+            sourceComponent: window.showBuilder ? builderPage : window.hasSelection ? libraryPage : welcomePage
+        }
+    }
+
+    // The builder keeps its state while hidden (it lives in the bridge).
+    Component {
+        id: builderPage
+        BuilderPage {
+            onCloseRequested: window.showBuilder = false
+            onNewLibraryRequested: { window.commitAfterCreate = true; newDbDialog.open() }
         }
     }
 
@@ -177,8 +193,27 @@ ApplicationWindow {
     }
 
     Connections {
-        target: Libraries
+        target: Inspector
         function onErrorOccurred(message) { window.showError(message) }
+    }
+    Connections {
+        target: Builder
+        function onErrorOccurred(message) { window.showError(message) }
+        function onCommitted(key, message) {
+            window.showBuilder = false
+            Libraries.selectLibrary(key)
+            infoDialog.text = message
+            infoDialog.open()
+        }
+    }
+    Connections {
+        target: Libraries
+        function onLibraryOpened(key) {
+            if (window.commitAfterCreate && window.showBuilder && contentLoader.item)
+                contentLoader.item.commitTo(key)
+            window.commitAfterCreate = false
+        }
+        function onErrorOccurred(message) { window.showError(message); window.commitAfterCreate = false }
         function onSelectedChanged() {
             if (window.hasSelection && !Libraries.selected.isTemp && Libraries.selected.path)
                 window.addRecent(Libraries.selected.path)
@@ -245,6 +280,7 @@ ApplicationWindow {
         defaultSuffix: "db"
         nameFilters: [qsTr("LibViz libraries (*.db)")]
         onAccepted: Libraries.createLibrary(selectedFile, "")
+        onRejected: window.commitAfterCreate = false
     }
     FileDialog {
         id: saveAsDialog
@@ -264,6 +300,12 @@ ApplicationWindow {
         function openWith(name) { nameField.text = name; open(); nameField.selectAll(); nameField.forceActiveFocus() }
         TextField { id: nameField; implicitWidth: 320; onAccepted: renameDialog.accept() }
         onAccepted: Libraries.renameSelected(nameField.text)
+    }
+
+    MessageDialog {
+        id: infoDialog
+        title: qsTr("LibViz")
+        buttons: MessageDialog.Ok
     }
 
     MessageDialog {

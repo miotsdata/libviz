@@ -9,14 +9,18 @@ src/libviz/
     managers/             LibraryManager: the set of open libraries, keyed by resolved path
     db/                   SQLAlchemy models + alembic migrations (src/libviz/migrations)
     readers/msp_reader.py bulk MSP import
+    readers/mzml_reader.py streaming MS2 reader (lxml), decodes only kept scans
+    builder.py            target list + mzML -> candidate spectra -> commit (ADR 4)
     utils/                MSP parsing, mass/adduct maths, logging
-  cli/     command line (no Qt)
+  cli/     command line (no Qt): libviz convert | build | info
   gui/     PySide6 + QML (ADR 2)
     main.py            build_engine() / main(); QML loaded from gui/qml/
     worker.py          Task: the one background-thread runner
     library_bridge.py  `Libraries` context property: open/import/save/close
     inspector_bridge.py `Inspector`: filters, selected compound/spectra/spectrum
     compound_model.py  paged, virtual compound table model (ADR 3)
+    builder_bridge.py  `Builder`: setup / run / review / commit (ADR 4)
+    dict_model.py      list model with in-place row updates
     qml/Main.qml       window, menubar, sidebar, status bar, dialogs
     qml/Style/         Theme singleton (light/dark tokens)
     qml/Views/         pages and panels

@@ -26,3 +26,23 @@ def test_window_follows_selected_library(qtbot, msp_file):
     qtbot.waitUntil(lambda: window.property("title") == "small — LibViz")
     libs.closeLibrary(libs.selectedKey)
     qtbot.waitUntil(lambda: window.property("title") == "LibViz")
+
+
+def test_every_page_loads_without_warnings(qtbot, msp_file):
+    bridges = make_bridges()
+    engine = build_engine(bridges)
+    warnings = []
+    engine.warnings.connect(warnings.extend)
+    window = engine.rootObjects()[0]
+    libs = bridges["Libraries"]
+
+    with qtbot.waitSignal(libs.libraryOpened, timeout=10_000):  # library page
+        libs.importMsp(str(msp_file))
+    qtbot.waitUntil(lambda: bridges["Inspector"].compounds.rowCount() > 0)
+    with qtbot.waitSignal(bridges["Inspector"].spectrumChanged, timeout=10_000):
+        bridges["Inspector"].selectCompoundRow(0)
+    window.setProperty("showBuilder", True)  # builder page
+    qtbot.wait(100)
+    window.setProperty("showBuilder", False)
+    qtbot.wait(100)
+    assert [w.toString() for w in warnings] == []

@@ -31,6 +31,7 @@ Item {
             Button { text: qsTr("New library…"); enabled: !Libraries.busy; onClicked: window.newLibraryDialog() }
             Button { text: qsTr("Open library…"); enabled: !Libraries.busy; onClicked: window.openLibraryDialog() }
             Button { text: qsTr("Import MSP…"); enabled: !Libraries.busy; onClicked: window.importMspDialog() }
+            Button { text: qsTr("Build from mzML…"); highlighted: true; onClicked: window.openBuilder() }
         }
 
         Label {
