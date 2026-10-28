@@ -168,7 +168,7 @@ Item {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        color: Theme.plotBackgroundColor
+                        color: "transparent"
                         StickPlot {
                             anchors.fill: parent
                             anchors.margins: 4

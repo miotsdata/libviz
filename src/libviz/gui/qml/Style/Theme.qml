@@ -31,14 +31,17 @@ QtObject {
     readonly property color darkColor: isDark ? "#1e1e1e" : "#a0a0a8"
     readonly property color shadowColor: "#000000"
 
-    // Plots follow the theme (Qt Graphs, no WebEngine).
-    readonly property color plotBackgroundColor: isDark ? "#252526" : "#ffffff"
-    readonly property color plotGridColor: isDark ? "#3a3a3d" : "#e5e5e5"
-    readonly property color plotTextColor: textColor
-    readonly property color plotAccentColor: isDark ? "#5aa9e6" : "#1f77b4"
-    readonly property color plotSecondColor: isDark ? "#e5a35a" : "#d62728"
-    readonly property color plotStrongColor: isDark ? "#e0e0e0" : "#000000"
-    readonly property color plotWeakColor: isDark ? "#7a7a7a" : "#999999"
+    // Spectrum plots: white plot area with a very light grid in *both*
+    // themes, as in MSIAnalyzer (its Theme.qml, ADR 51). Only the axes and
+    // labels outside the plot area follow textColor.
+    readonly property color plotBackgroundColor: "#ffffff"
+    readonly property color plotGridColor: "#e5e5e5"
+    // Text drawn inside the plot area (the mirror plot's captions).
+    readonly property color plotTextColor: "#202020"
+    readonly property color plotAccentColor: "#1f77b4"
+    readonly property color plotSecondColor: "#d62728"
+    readonly property color plotStrongColor: "#000000"
+    readonly property color plotWeakColor: "#999999"
 
     // Type / spacing
     readonly property int headingPixelSize: 18

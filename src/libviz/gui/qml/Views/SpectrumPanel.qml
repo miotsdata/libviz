@@ -159,7 +159,7 @@ SplitView {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: Theme.plotBackgroundColor
+            color: "transparent"
             StickPlot {
                 id: plot
                 objectName: "spectrumPlot"
