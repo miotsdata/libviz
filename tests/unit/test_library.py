@@ -63,7 +63,7 @@ def saved_library(tmp_path, monkeypatch) -> Path:
 
     ]
 
-    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: fake_entries)
+    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda *_: fake_entries)
 
     loaded_library = Library.load_from_msp(Path("dummy.msp"))
     db_path = Path(tmp_path / "test.db")
@@ -79,7 +79,7 @@ def loaded_library(saved_library) -> Library:
 
 @pytest.fixture
 def empty_library(tmp_path, monkeypatch):
-    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: [])
+    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda *_: [])
 
     db_path = tmp_path / "empty.db"
     loaded_library = Library.load_from_msp(Path("dummy.msp"))
@@ -805,7 +805,7 @@ def test_saved_library_uses_safe_pragmas(saved_library):
 
 
 def test_temp_import_library_uses_fast_pragmas(tmp_path, monkeypatch):
-    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: [])
+    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda *_: [])
     lib = Library.load_from_msp(Path("dummy.msp"))
     assert _pragma(lib, "synchronous") == 0
     lib.close()
@@ -813,7 +813,7 @@ def test_temp_import_library_uses_fast_pragmas(tmp_path, monkeypatch):
 
 
 def test_edits_after_save_go_to_saved_file(tmp_path, monkeypatch):
-    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: [])
+    monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda *_: [])
     lib = Library.load_from_msp(Path("dummy.msp"))
     temp_path = lib.path
     lib.save_as_db(tmp_path / "out.db")

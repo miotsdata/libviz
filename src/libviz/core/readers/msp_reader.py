@@ -39,7 +39,7 @@ class MSPReader:
         self.default_precursor_type: str = default_precursor_type
 
     # ---------- public API ----------
-    def import_file(self, msp_path: Path):
+    def import_file(self, msp_path: Path, progress=None):
         if not isinstance(msp_path, Path):
             raise TypeError(f"Msp_path should be a Path object. Found {type(msp_path).__name__}")
 
@@ -48,7 +48,7 @@ class MSPReader:
         compound_rows: list[dict] = []
         spectrum_rows: list[dict] = []
 
-        for i, entry in enumerate(parse_msp(msp_path), start=1):
+        for i, entry in enumerate(parse_msp(msp_path, progress), start=1):
             self._collect_entry(entry, compound_rows, spectrum_rows)
 
             if i % self.BATCH_SIZE == 0:

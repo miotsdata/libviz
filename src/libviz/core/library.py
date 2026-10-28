@@ -143,7 +143,7 @@ class Library:
 
     # ---------- Loading ----------
     @classmethod
-    def load_from_msp(cls, msp_path: Path, default_precursor_type: str = "[M+H]+"):
+    def load_from_msp(cls, msp_path: Path, default_precursor_type: str = "[M+H]+", progress=None):
         """Import an MSP file into a new temp library (``is_temp``)."""
         logger.debug("Loading library from MSP file %s", msp_path)
 
@@ -156,7 +156,7 @@ class Library:
 
         with lib.session_scope() as session:
             reader = MSPReader(session, default_precursor_type=default_precursor_type)
-            reader.import_file(msp_path)
+            reader.import_file(msp_path, progress)
 
         lib.is_temp = True
 

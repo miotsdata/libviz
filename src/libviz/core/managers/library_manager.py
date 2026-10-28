@@ -19,7 +19,8 @@ class LibraryManager:
         self._libraries: dict[str, Library] = {}
         self._selected_library: str | None = None
 
-    def _add(self, lib: Library) -> str:
+    def add(self, lib: Library) -> str:
+        """Register an already-open library and select it."""
         key = library_key(lib.path)
         if key in self._libraries:
             self._libraries[key].close()
@@ -28,17 +29,17 @@ class LibraryManager:
         return key
 
     def create_library(self, name: str, path: str | Path) -> str:
-        return self._add(Library.create(name=name, path=Path(path)))
+        return self.add(Library.create(name=name, path=Path(path)))
 
     def load_library_from_msp(self, msp_path: str | Path) -> str:
-        return self._add(Library.load_from_msp(Path(msp_path)))
+        return self.add(Library.load_from_msp(Path(msp_path)))
 
     def load_library_from_db(self, path: str | Path) -> str:
         key = library_key(path)
         if key in self._libraries:
             self._selected_library = key
             return key
-        return self._add(Library.load_from_db(Path(path)))
+        return self.add(Library.load_from_db(Path(path)))
 
     def save_as_db(self, path: str | Path) -> str:
         """Save the selected library to ``path``; it is re-keyed there."""
@@ -47,8 +48,15 @@ class LibraryManager:
             raise ValueError("No library selected to save.")
         old_key = self._selected_library
         lib.save_as_db(Path(path))
-        del self._libraries[old_key]
-        return self._add(lib)
+        return self.rekey(old_key)
+
+    def rekey(self, old_key: str) -> str:
+        """Re-register a library whose ``path`` changed (after a save)."""
+        lib = self._libraries.pop(old_key)
+        key = library_key(lib.path)
+        self._libraries[key] = lib
+        self._selected_library = key
+        return key
 
     def unload_library(self, path: str | Path):
         lib = self._libraries.pop(library_key(path), None)

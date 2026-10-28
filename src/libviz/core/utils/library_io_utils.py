@@ -2,11 +2,19 @@ from collections.abc import Generator
 from pathlib import Path
 
 
-def parse_msp(file_path: Path) -> Generator[dict, None, None]:
+def parse_msp(file_path: Path, progress=None) -> Generator[dict, None, None]:
+    """Yield one dict per MSP entry. ``progress(done, total)`` (optional)
+    is called every 50k lines with approximate characters read / file size."""
+    total = Path(file_path).stat().st_size if progress else 0
+    done = 0
     with open(file_path, "r", encoding="utf-8") as f:
         entry_lines = []
 
-        for line in f:
+        for n, line in enumerate(f, start=1):
+            if progress:
+                done += len(line)
+                if n % 50_000 == 0:
+                    progress(min(done, total), total)
             line = line.rstrip()
 
             if line == "":  # blank line = end of entry

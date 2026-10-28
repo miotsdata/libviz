@@ -479,7 +479,7 @@ class TestKeys:
             LibraryManager().select_library("/nope.db")
 
     def test_save_rekeys_temp_library(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda _: [])
+        monkeypatch.setattr("libviz.core.readers.msp_reader.parse_msp", lambda *_: [])
         mgr = LibraryManager()
         temp_key = mgr.load_library_from_msp(tmp_path / "x.msp")
         temp_file = Path(temp_key)

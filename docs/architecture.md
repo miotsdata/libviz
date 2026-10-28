@@ -11,8 +11,21 @@ src/libviz/
     readers/msp_reader.py bulk MSP import
     utils/                MSP parsing, mass/adduct maths, logging
   cli/     command line (no Qt)
-  gui/     PySide6 + QML
+  gui/     PySide6 + QML (ADR 2)
+    main.py            build_engine() / main(); QML loaded from gui/qml/
+    worker.py          Task: the one background-thread runner
+    library_bridge.py  `Libraries` context property: open/import/save/close
+    qml/Main.qml       window, menubar, sidebar, status bar, dialogs
+    qml/Style/         Theme singleton (light/dark tokens)
+    qml/Views/         pages and panels
 ```
+
+## GUI rules
+
+- No DB or file I/O on the GUI thread. Use `start_task(owner, fn, ...)`.
+- Bridge and manager state is only mutated in task callbacks, which run on
+  the GUI thread.
+- Colors come from `Theme`, never hex literals in views.
 
 Layer rules are enforced by `tests/test_architecture.py`: `core` imports
 neither `cli` nor `gui`, `cli` doesn't import `gui`, and there are no import
