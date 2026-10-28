@@ -9,6 +9,9 @@ Rectangle {
     color: Theme.fieldColor
     property int selectedRow: -1
     readonly property var model: Inspector.compounds
+    signal editRequested()
+    signal exportRequested()
+    signal deleteRequested()
     readonly property var widths: [0.27, 0.17, 0.16, 0.29, 0.11]
 
     function select(row) {
@@ -88,7 +91,18 @@ Rectangle {
                     font.family: column === 3 ? "monospace" : Qt.application.font.family
                 }
                 TapHandler { onTapped: { table.forceActiveFocus(); root.select(parent.row) } }
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: { root.select(parent.row); rowMenu.popup() }
+                }
             }
+        }
+        Menu {
+            id: rowMenu
+            MenuItem { text: qsTr("Edit compound…"); onTriggered: root.editRequested() }
+            MenuItem { text: qsTr("Export as MSP…"); onTriggered: root.exportRequested() }
+            MenuSeparator {}
+            MenuItem { text: qsTr("Delete compound…"); onTriggered: root.deleteRequested() }
         }
 
         Rectangle {

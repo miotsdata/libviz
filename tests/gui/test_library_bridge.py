@@ -98,3 +98,19 @@ def test_open_failure_reports_error(qtbot, bridge, tmp_path):
         bridge.openLibrary(str(tmp_path / "missing.db"))
     assert "missing.db" in blocker.args[0]
     assert not bridge.busy
+
+
+def test_export_and_merge(qtbot, bridge, msp_file, tmp_path):
+    _import(qtbot, bridge, msp_file)
+    with qtbot.waitSignal(bridge.infoMessage, timeout=10_000) as blocker:
+        bridge.exportSelectedMsp(str(tmp_path / "out"))
+    assert blocker.args[0] == "Exported 2 spectra to out.msp."
+
+    other = Library.create(tmp_path / "other.db", name="Other")
+    other.add_spectra("Benzene", "C6H6", "UHOVQNZJYSORNB-UHFFFAOYSA-N",
+                      {"precursor_mz": 79.05, "polarity": "POSITIVE", "collision_energy": 20.0,
+                       "mz": [50.0], "intensity": [1.0]}, other.get_adducts()[0]["id"])
+    with qtbot.waitSignal(bridge.infoMessage, timeout=10_000) as blocker:
+        bridge.mergeIntoSelected(str(tmp_path / "other.db"))
+    assert "1 spectra added (1 new compounds)" in blocker.args[0]
+    qtbot.waitUntil(lambda: bridge.selected["nSpectra"] == 3)

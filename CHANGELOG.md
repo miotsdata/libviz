@@ -15,7 +15,9 @@
 - Library inspector (ADR 3): search by name/formula/InChIKey or mass ± ppm, polarity/adduct/CE filters, sortable paged compound table that stays fast on 500k-spectrum libraries, spectra list, interactive spectrum plot, compound identifiers and spectrum metadata, copy peaks.
 - **Build library spectra from mzML** (ADR 4): target list (CSV/TSV) + DDA/DIA/imaging mzML files → one spectrum per compound/adduct/CE, reviewed and picked in the GUI (mirror-plot comparison) or chosen automatically by `libviz build`; provenance stored as spectrum metadata; skip/replace existing spectra.
 - Fast streaming mzML reader (`core/readers/mzml_reader.py`), no new dependency.
-- `libviz` command line: `convert`, `build`, `info`.
+- Curation (ADR 5): edit compounds (name, formula, SMILES, PubChem), delete compounds/spectra, add/edit/delete spectrum metadata.
+- Export a library or a single compound as MSP; merge libraries (identical spectra skipped).
+- `libviz` command line: `convert`, `build`, `export`, `merge`, `info`.
 - `mass_utils.adduct_mz` (electron-corrected adduct m/z).
 - `Library.search_compounds`, `count_compounds`, `filter_options`, `get_compound`, `get_compound_spectra`, `get_spectrum`.
 

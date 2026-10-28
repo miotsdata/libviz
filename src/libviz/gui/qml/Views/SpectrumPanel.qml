@@ -10,6 +10,12 @@ SplitView {
     readonly property var compound: Inspector.compound
     readonly property var spectrum: Inspector.spectrum
     readonly property bool hasCompound: compound.id !== undefined
+    signal editCompoundRequested()
+    signal exportCompoundRequested()
+    signal deleteCompoundRequested()
+    signal deleteSpectrumRequested(int spectrumId)
+    signal editMetadataRequested(string key, string value)  // key "" = new field
+    signal deleteMetadataRequested(string key)
 
     function fmt(v, digits) { return v === undefined || v === null ? "—" : Number(v).toFixed(digits) }
 
@@ -19,15 +25,30 @@ SplitView {
         SplitView.minimumHeight: 110
         spacing: 4
 
-        Label {
+        RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: 8
             Layout.topMargin: 6
-            text: root.hasCompound ? root.compound.name : qsTr("Select a compound")
-            font.pixelSize: Theme.headingPixelSize
-            font.bold: root.hasCompound
-            color: root.hasCompound ? Theme.textColor : Theme.placeholderTextColor
-            elide: Text.ElideRight
+            Label {
+                Layout.fillWidth: true
+                text: root.hasCompound ? root.compound.name : qsTr("Select a compound")
+                font.pixelSize: Theme.headingPixelSize
+                font.bold: root.hasCompound
+                color: root.hasCompound ? Theme.textColor : Theme.placeholderTextColor
+                elide: Text.ElideRight
+            }
+            ToolButton {
+                visible: root.hasCompound
+                text: "⋯"
+                onClicked: compoundMenu.popup()
+                Menu {
+                    id: compoundMenu
+                    MenuItem { text: qsTr("Edit compound…"); onTriggered: root.editCompoundRequested() }
+                    MenuItem { text: qsTr("Export as MSP…"); onTriggered: root.exportCompoundRequested() }
+                    MenuSeparator {}
+                    MenuItem { text: qsTr("Delete compound…"); onTriggered: root.deleteCompoundRequested() }
+                }
+            }
         }
         Label {
             visible: root.hasCompound
@@ -64,6 +85,14 @@ SplitView {
                 height: 24
                 highlighted: modelData.id === root.spectrum.id
                 onClicked: Inspector.selectSpectrum(modelData.id)
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: { Inspector.selectSpectrum(srow.modelData.id); spectrumMenu.popup() }
+                }
+                Menu {
+                    id: spectrumMenu
+                    MenuItem { text: qsTr("Delete spectrum…"); onTriggered: root.deleteSpectrumRequested(srow.modelData.id) }
+                }
                 contentItem: Row {
                     Repeater {
                         model: [[srow.modelData.adduct, 110], [srow.modelData.polarity, 90],
@@ -166,12 +195,21 @@ SplitView {
                     HoverHandler { cursorShape: Qt.PointingHandCursor }
                 }
             }
+            RowLayout {
+                visible: root.spectrum.id !== undefined
+                Layout.topMargin: 6
+                Label { text: qsTr("Spectrum metadata"); font.bold: true; Layout.fillWidth: true }
+                ToolButton { text: qsTr("Add field…"); onClicked: root.editMetadataRequested("", "") }
+            }
             Repeater {
                 model: root.spectrum.metadata ? Object.keys(root.spectrum.metadata).sort() : []
                 delegate: RowLayout {
+                    id: mrow
                     required property string modelData
-                    Key { text: parent.modelData; ToolTip.visible: hov.hovered; ToolTip.text: parent.modelData; HoverHandler { id: hov } }
-                    Value { text: root.spectrum.metadata[parent.modelData] }
+                    Key { text: mrow.modelData; ToolTip.visible: hov.hovered; ToolTip.text: mrow.modelData; HoverHandler { id: hov } }
+                    Value { text: root.spectrum.metadata[mrow.modelData] }
+                    ToolButton { text: "✎"; flat: true; onClicked: root.editMetadataRequested(mrow.modelData, root.spectrum.metadata[mrow.modelData]) }
+                    ToolButton { text: "✕"; flat: true; onClicked: root.deleteMetadataRequested(mrow.modelData) }
                 }
             }
         }

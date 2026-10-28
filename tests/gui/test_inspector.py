@@ -120,3 +120,65 @@ def test_closing_library_clears_inspector(qtbot, bridges, tmp_path):
         libraries.closeLibrary(libraries.selectedKey)
     assert inspector.compound == {}
     assert inspector.compounds.rowCount() == 0
+
+
+def _open_and_select(qtbot, libraries, inspector, path, row=0):
+    with qtbot.waitSignal(inspector.filterOptionsChanged, timeout=5000):
+        libraries.openLibrary(str(path))
+    qtbot.waitUntil(lambda: inspector.compounds.rowCount() > 0)
+    with qtbot.waitSignal(inspector.spectrumChanged, timeout=5000):
+        inspector.selectCompoundRow(row)
+
+
+def test_edit_compound_and_metadata(qtbot, bridges, tmp_path):
+    libraries, inspector = bridges
+    _open_and_select(qtbot, libraries, inspector, tmp_path / "lib.db")
+
+    with qtbot.waitSignal(inspector.compoundChanged, timeout=5000):
+        inspector.updateCompound("Renamed", "C7H8", "Cc1ccccc1", "1140")
+    assert inspector.compound["name"] == "Renamed"
+    assert inspector.compound["pubchem_id"] == 1140
+    qtbot.waitUntil(lambda: inspector.compounds.data(inspector.compounds.index(2, 0)) == "Renamed")
+
+    # Earlier reloads may still be in flight: wait for the state, not a signal.
+    inspector.setMetadata("note", "checked")
+    qtbot.waitUntil(lambda: inspector.spectrum.get("metadata") == {"note": "checked"})
+    inspector.deleteMetadata("note")
+    qtbot.waitUntil(lambda: inspector.spectrum.get("metadata") == {})
+
+    with qtbot.waitSignal(inspector.errorOccurred, timeout=1000):
+        inspector.updateCompound("x", "C7H8", "", "abc")
+
+
+def test_delete_spectrum_then_compound(qtbot, bridges, tmp_path):
+    libraries, inspector = bridges
+    _open_and_select(qtbot, libraries, inspector, tmp_path / "lib.db")
+
+    with qtbot.waitSignal(inspector.spectraChanged, timeout=5000):
+        inspector.deleteSpectrum(inspector.spectrum["id"])
+    assert inspector.spectra == []
+    qtbot.waitUntil(lambda: libraries.selected["nSpectra"] == 2)
+
+    with qtbot.waitSignal(inspector.compounds.countChanged, timeout=5000):
+        inspector.deleteCompound()
+    assert inspector.compound == {}
+    assert inspector.compounds.rowCount() == 2
+    qtbot.waitUntil(lambda: libraries.selected["nCompounds"] == 2)
+
+
+def test_export_compound(qtbot, bridges, tmp_path):
+    libraries, inspector = bridges
+    _open_and_select(qtbot, libraries, inspector, tmp_path / "lib.db", row=1)
+    with qtbot.waitSignal(libraries.infoMessage, timeout=5000):
+        inspector.exportCompoundMsp(str(tmp_path / "one"))
+    assert "NAME: cmp001" in (tmp_path / "one.msp").read_text()
+
+
+def test_only_newest_selection_is_applied(qtbot, bridges, tmp_path):
+    libraries, inspector = bridges
+    _open_and_select(qtbot, libraries, inspector, tmp_path / "lib.db")
+    for row in (0, 1, 2, 1, 2):
+        inspector.selectCompoundRow(row)
+    qtbot.waitUntil(lambda: inspector.compound.get("name") == "cmp002" and inspector.spectrum.get("mz") == [52.0])
+    qtbot.wait(100)
+    assert inspector.compound["name"] == "cmp002"

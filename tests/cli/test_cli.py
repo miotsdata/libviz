@@ -39,3 +39,14 @@ def test_errors_are_one_line(tmp_path, capsys):
     (tmp_path / "t.csv").write_text("name\nx\n")
     assert main(["build", str(tmp_path / "t.csv"), "x.mzML", "-o", str(tmp_path / "o.db")]) == 1
     assert capsys.readouterr().err.startswith("error: missing column")
+
+
+def test_export_and_merge(tmp_path, capsys):
+    (tmp_path / "a.msp").write_text(MSP)
+    assert main(["convert", str(tmp_path / "a.msp")]) == 0
+    assert main(["export", str(tmp_path / "a.db"), "-o", str(tmp_path / "back.msp")]) == 0
+    assert "INCHIKEY: UHOVQNZJYSORNB-UHFFFAOYSA-N" in (tmp_path / "back.msp").read_text()
+
+    assert main(["merge", str(tmp_path / "all.db"), str(tmp_path / "a.db"), str(tmp_path / "a.db")]) == 0
+    out = capsys.readouterr().out
+    assert "+1 spectra" in out and "+0 spectra" in out and "1 compounds, 1 spectra" in out

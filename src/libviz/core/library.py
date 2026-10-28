@@ -12,6 +12,7 @@ from libviz.core.db.migrations import upgrade_library_schema
 from libviz.core.readers import MSPReader
 
 from libviz.core.db.models import (
+    SpectrumMetadata,
     Compound,
     Spectrum,
     LibraryMetadata,
@@ -502,4 +503,131 @@ class Library:
                 "metadata": {m.key: m.value for m in s.spectrum_metadata},
                 "added_on": s.added_on.isoformat(timespec="seconds") if s.added_on else "",
             }
+
+    # ---------- Editing ----------
+
+    def update_compound(self, compound_id: int, *, name: str | None = None, formula: str | None = None,
+                        smiles: str | None = None, pubchem_id: int | None = None):
+        """Change compound fields (``None`` = unchanged; ``""`` clears SMILES).
+        A new formula recomputes the exact mass; the InChIKey is the
+        compound's identity and is not editable."""
+        with self.session_scope() as session:
+            c = session.get(Compound, compound_id)
+            if c is None:
+                raise ValueError(f"Compound with ID {compound_id} not found")
+            if name is not None:
+                if not name.strip():
+                    raise ValueError("name cannot be empty")
+                c.name = name.strip()
+            if formula is not None and formula.strip() != c.formula:
+                mass = calculate_exact_mass(formula.strip())
+                if mass is None:
+                    raise ValueError(f"invalid formula {formula!r}")
+                c.formula, c.exact_mass = formula.strip(), mass
+            if smiles is not None:
+                c.smiles = smiles.strip() or None
+            if pubchem_id is not None:
+                c.pubchem_id = pubchem_id or None
+
+    def delete_spectra(self, spectrum_ids: list[int]) -> int:
+        """Delete spectra and their metadata; compounds are kept."""
+        with self.session_scope() as session:
+            session.query(SpectrumMetadata).filter(SpectrumMetadata.spectrum_id.in_(spectrum_ids)).delete()
+            return session.query(Spectrum).filter(Spectrum.id.in_(spectrum_ids)).delete()
+
+    def delete_compounds(self, compound_ids: list[int]) -> int:
+        """Delete compounds with all their spectra and metadata."""
+        with self.session_scope() as session:
+            spectra = select(Spectrum.id).where(Spectrum.compound_id.in_(compound_ids))
+            session.query(SpectrumMetadata).filter(SpectrumMetadata.spectrum_id.in_(spectra)).delete()
+            session.query(Spectrum).filter(Spectrum.compound_id.in_(compound_ids)).delete()
+            return session.query(Compound).filter(Compound.id.in_(compound_ids)).delete()
+
+    def set_spectrum_metadata(self, spectrum_id: int, key: str, value: str):
+        """Set (add or overwrite) one metadata field of a spectrum."""
+        key = key.strip()
+        if not key:
+            raise ValueError("metadata key cannot be empty")
+        with self.session_scope() as session:
+            if session.get(Spectrum, spectrum_id) is None:
+                raise ValueError(f"Spectrum with ID {spectrum_id} not found")
+            rows = session.query(SpectrumMetadata).filter_by(spectrum_id=spectrum_id, key=key).all()
+            if rows:
+                rows[0].value = str(value)
+                for extra in rows[1:]:
+                    session.delete(extra)
+            else:
+                session.add(SpectrumMetadata(spectrum_id=spectrum_id, key=key, value=str(value)))
+
+    def delete_spectrum_metadata(self, spectrum_id: int, key: str):
+        with self.session_scope() as session:
+            session.query(SpectrumMetadata).filter_by(spectrum_id=spectrum_id, key=key).delete()
+
+    # ---------- Merging ----------
+
+    def merge_from(self, source: Path) -> dict[str, int]:
+        """Copy every compound, adduct type and spectrum (with metadata) of
+        the library file ``source`` into this one, in SQL (ATTACH).
+
+        Compounds are matched by InChIKey (the existing one wins), adduct
+        types by formula. A spectrum identical to one already here (same
+        compound, adduct, polarity, CE and peaks) is skipped.
+        """
+        source = Path(source).resolve()
+        if source == self.path.resolve():
+            raise ValueError("cannot merge a library into itself")
+        if not source.exists():
+            raise FileNotFoundError(source)
+        conn = self.engine.raw_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("ATTACH DATABASE ? AS src", (str(source),))
+            try:
+                if cur.execute("SELECT name FROM src.sqlite_master WHERE name = 'spectrum'").fetchone() is None:
+                    raise ValueError(f"{source.name} is not a LibViz library")
+                n_compounds = cur.execute("SELECT COUNT(*) FROM compound").fetchone()[0]
+                n_src = cur.execute("SELECT COUNT(*) FROM src.spectrum").fetchone()[0]
+                max_id = cur.execute("SELECT COALESCE(MAX(id), 0) FROM spectrum").fetchone()[0]
+                cur.execute(
+                    "INSERT OR IGNORE INTO compound (name, formula, exact_mass, inchikey, smiles, pubchem_id, added_on)"
+                    " SELECT name, formula, exact_mass, inchikey, smiles, pubchem_id, added_on FROM src.compound")
+                cur.execute(
+                    "INSERT INTO adduct_type (formula, charge, delta_mass, multiplication_factor)"
+                    " SELECT formula, charge, delta_mass, multiplication_factor FROM src.adduct_type sa"
+                    " WHERE NOT EXISTS (SELECT 1 FROM adduct_type a WHERE a.formula IS sa.formula)")
+                cur.execute(
+                    "INSERT OR IGNORE INTO spectrum (compound_id, precursor_mz, adduct_type_id, polarity,"
+                    " collision_energy, mz_array, intensity_array, added_on, spectrum_hash)"
+                    " SELECT c.id, s.precursor_mz, a.id, s.polarity, s.collision_energy, s.mz_array,"
+                    " s.intensity_array, s.added_on, s.spectrum_hash"
+                    " FROM src.spectrum s"
+                    " JOIN src.compound sc ON sc.id = s.compound_id JOIN compound c ON c.inchikey = sc.inchikey"
+                    " JOIN src.adduct_type sa ON sa.id = s.adduct_type_id JOIN adduct_type a ON a.formula IS sa.formula"
+                    # Explicit, not just OR IGNORE: the UNIQUE constraint
+                    # treats NULL polarities as distinct.
+                    " WHERE NOT EXISTS (SELECT 1 FROM spectrum m WHERE m.spectrum_hash = s.spectrum_hash"
+                    "  AND m.compound_id = c.id AND m.adduct_type_id = a.id AND m.polarity IS s.polarity"
+                    "  AND m.collision_energy = s.collision_energy)"
+                    " ORDER BY s.id")
+                added = cur.execute("SELECT COUNT(*) FROM spectrum WHERE id > ?", (max_id,)).fetchone()[0]
+                # Metadata only for the spectra just inserted, found by identity.
+                cur.execute(
+                    "INSERT INTO spectrum_metadata (spectrum_id, key, value)"
+                    " SELECT m.id, sm.key, sm.value FROM src.spectrum_metadata sm"
+                    " JOIN src.spectrum s ON s.id = sm.spectrum_id"
+                    " JOIN src.compound sc ON sc.id = s.compound_id JOIN compound c ON c.inchikey = sc.inchikey"
+                    " JOIN src.adduct_type sa ON sa.id = s.adduct_type_id JOIN adduct_type a ON a.formula IS sa.formula"
+                    " JOIN spectrum m ON m.id > ? AND m.compound_id = c.id AND m.adduct_type_id = a.id"
+                    "  AND m.polarity IS s.polarity AND m.collision_energy = s.collision_energy"
+                    "  AND m.spectrum_hash = s.spectrum_hash", (max_id,))
+                new_compounds = cur.execute("SELECT COUNT(*) FROM compound").fetchone()[0] - n_compounds
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                cur.execute("DETACH DATABASE src")
+        finally:
+            conn.close()
+        return {"compounds_added": new_compounds, "spectra_added": added, "spectra_skipped": n_src - added}
 

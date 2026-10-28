@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import "../Style"
 
@@ -120,11 +121,95 @@ Item {
             CompoundTable {
                 SplitView.preferredWidth: page.width * 0.45
                 SplitView.minimumWidth: 300
+                onEditRequested: compoundDialog.openFor(Inspector.compound)
+                onExportRequested: exportDialog.open()
+                onDeleteRequested: confirmDialog.ask(qsTr("Delete compound “%1” and all its spectra?").arg(Inspector.compound.name),
+                                                     function () { Inspector.deleteCompound() })
             }
             SpectrumPanel {
                 SplitView.fillWidth: true
                 SplitView.minimumWidth: 320
+                onEditCompoundRequested: compoundDialog.openFor(Inspector.compound)
+                onExportCompoundRequested: exportDialog.open()
+                onDeleteCompoundRequested: confirmDialog.ask(qsTr("Delete compound “%1” and all its spectra?").arg(Inspector.compound.name),
+                                                             function () { Inspector.deleteCompound() })
+                onDeleteSpectrumRequested: id => confirmDialog.ask(qsTr("Delete this spectrum?"), function () { Inspector.deleteSpectrum(id) })
+                onEditMetadataRequested: (key, value) => metadataDialog.openFor(key, value)
+                onDeleteMetadataRequested: key => Inspector.deleteMetadata(key)
             }
         }
+    }
+
+    // =========================
+    // EDIT DIALOGS (ADR 5)
+    // =========================
+    Dialog {
+        id: compoundDialog
+        objectName: "compoundDialog"
+        title: qsTr("Edit compound")
+        anchors.centerIn: parent
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        function openFor(c) {
+            nameEdit.text = c.name || ""; formulaEdit.text = c.formula || ""
+            smilesEdit.text = c.smiles || ""; pubchemEdit.text = c.pubchem_id ? String(c.pubchem_id) : ""
+            inchikeyLabel.text = c.inchikey || ""
+            open()
+        }
+        onAccepted: Inspector.updateCompound(nameEdit.text, formulaEdit.text, smilesEdit.text, pubchemEdit.text)
+        GridLayout {
+            columns: 2
+            columnSpacing: 10
+            Label { text: qsTr("InChIKey") }
+            Label { id: inchikeyLabel; color: Theme.mutedTextColor; font.family: "monospace" }
+            Label { text: qsTr("Name") }
+            TextField { id: nameEdit; Layout.preferredWidth: 360 }
+            Label { text: qsTr("Formula") }
+            TextField { id: formulaEdit; Layout.fillWidth: true }
+            Label { text: qsTr("SMILES") }
+            TextField { id: smilesEdit; Layout.fillWidth: true }
+            Label { text: qsTr("PubChem CID") }
+            TextField { id: pubchemEdit; Layout.fillWidth: true; validator: RegularExpressionValidator { regularExpression: /^\d*$/ } }
+        }
+    }
+
+    Dialog {
+        id: metadataDialog
+        title: originalKey ? qsTr("Edit metadata field") : qsTr("Add metadata field")
+        anchors.centerIn: parent
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        property string originalKey
+        function openFor(key, value) { originalKey = key; keyEdit.text = key; valueEdit.text = value; open(); keyEdit.forceActiveFocus() }
+        onAccepted: {
+            if (!keyEdit.text.trim()) return
+            if (originalKey && originalKey !== keyEdit.text.trim()) Inspector.deleteMetadata(originalKey)
+            Inspector.setMetadata(keyEdit.text, valueEdit.text)
+        }
+        GridLayout {
+            columns: 2
+            Label { text: qsTr("Key") }
+            TextField { id: keyEdit; Layout.preferredWidth: 320 }
+            Label { text: qsTr("Value") }
+            TextField { id: valueEdit; Layout.fillWidth: true }
+        }
+    }
+
+    MessageDialog {
+        id: confirmDialog
+        title: qsTr("Delete")
+        property var action
+        function ask(question, fn) { text = question; action = fn; open() }
+        buttons: MessageDialog.Yes | MessageDialog.Cancel
+        onButtonClicked: (button, role) => { if (button === MessageDialog.Yes && action) action() }
+    }
+
+    FileDialog {
+        id: exportDialog
+        title: qsTr("Export compound as MSP")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "msp"
+        nameFilters: [qsTr("MSP files (*.msp)")]
+        onAccepted: Inspector.exportCompoundMsp(selectedFile)
     }
 }

@@ -2,7 +2,8 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 
 from libviz.gui.compound_model import CompoundTableModel
-from libviz.gui.library_bridge import LibraryBridge
+from libviz.core.writers import write_msp
+from libviz.gui.library_bridge import LibraryBridge, to_local_path
 from libviz.gui.worker import start_task
 
 
@@ -40,6 +41,9 @@ class InspectorBridge(QObject):
         self._compound: dict = {}
         self._spectra: list = []
         self._spectrum: dict = {}
+        # Only the newest compound/spectrum request is applied (fast clicking).
+        self._compound_request = 0
+        self._spectrum_request = 0
         libraries.selectedChanged.connect(self._on_selected)
         libraries.libraryContentChanged.connect(self._on_content_changed)
 
@@ -91,11 +95,14 @@ class InspectorBridge(QObject):
         if lib is None:
             return
 
+        self._compound_request += 1
+        request = self._compound_request
+
         def load():
             return lib.get_compound(compound_id), lib.get_compound_spectra(compound_id)
 
         def loaded(result):
-            if key != self._key:
+            if key != self._key or request != self._compound_request:
                 return
             self._compound, self._spectra = result
             self.compoundChanged.emit()
@@ -160,11 +167,75 @@ class InspectorBridge(QObject):
         if lib is None:
             return
 
+        self._spectrum_request += 1
+        request = self._spectrum_request
+
         def loaded(spectrum):
-            if key == self._key:
+            if key == self._key and request == self._spectrum_request:
                 self._spectrum = spectrum
                 self.spectrumChanged.emit()
         start_task(self, lib.get_spectrum, spectrum_id, on_success=loaded, on_error=self._error_for(key))
+
+    # --- editing (ADR 5) ----------------------------------------------------
+
+    def _write(self, fn, *args, then=None, **kwargs):
+        """Run a library write; then tell everyone the library changed."""
+        key = self._key
+        if not key:
+            return
+
+        def done(_):
+            if then is not None:
+                then()
+            self._libraries.libraryContentChanged.emit(key)
+            self._libraries.refresh(key)
+        start_task(self, fn, *args, on_success=done, on_error=self._error_for(key), **kwargs)
+
+    @Slot(str, str, str, str)
+    def updateCompound(self, name: str, formula: str, smiles: str, pubchem_id: str):
+        if self._compound and self._lib is not None:
+            pubchem = pubchem_id.strip()
+            if pubchem and not pubchem.isdigit():
+                self.errorOccurred.emit(f"PubChem CID must be a number, not {pubchem!r}")
+                return
+            self._write(self._lib.update_compound, self._compound["id"], name=name, formula=formula,
+                        smiles=smiles, pubchem_id=int(pubchem) if pubchem else 0)
+
+    @Slot()
+    def deleteCompound(self):
+        if self._compound and self._lib is not None:
+            self._write(self._lib.delete_compounds, [self._compound["id"]], then=self._clear_selection)
+
+    @Slot(int)
+    def deleteSpectrum(self, spectrum_id: int):
+        if self._lib is not None:
+            def forget():
+                if self._spectrum.get("id") == spectrum_id:
+                    self._spectrum = {}
+            self._write(self._lib.delete_spectra, [spectrum_id], then=forget)
+
+    @Slot(str, str)
+    def setMetadata(self, key: str, value: str):
+        if self._spectrum and self._lib is not None:
+            self._write(self._lib.set_spectrum_metadata, self._spectrum["id"], key, value)
+
+    @Slot(str)
+    def deleteMetadata(self, key: str):
+        if self._spectrum and self._lib is not None:
+            self._write(self._lib.delete_spectrum_metadata, self._spectrum["id"], key)
+
+    @Slot(str)
+    def exportCompoundMsp(self, url: str):
+        """Export the selected compound's spectra as MSP."""
+        lib, key = self._lib, self._key
+        if not self._compound or lib is None:
+            return
+        path = to_local_path(url)
+        if not path.lower().endswith(".msp"):
+            path += ".msp"
+        start_task(self, write_msp, lib, path, compound_ids=[self._compound["id"]],
+                   on_success=lambda n: self._libraries.infoMessage.emit(f"Exported {n} spectra to {path}."),
+                   on_error=self._error_for(key))
 
     @Slot()
     def copyPeaks(self):

@@ -6,6 +6,7 @@ from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 from libviz.core import LibraryManager
 from libviz.core.library import Library
 from libviz.core.managers.library_manager import library_key
+from libviz.core.writers import write_msp
 from libviz.gui.worker import start_task
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class LibraryBridge(QObject):
     busyChanged = Signal()
     progressChanged = Signal()
     errorOccurred = Signal(str)
+    infoMessage = Signal(str)
     libraryOpened = Signal(str)  # key
     # Emitted after anything that may change a library's content (P2+ views reload).
     libraryContentChanged = Signal(str)  # key
@@ -191,6 +193,37 @@ class LibraryBridge(QObject):
             self.librariesChanged.emit()
             self.selectedChanged.emit()
         self._run(f"Saving {path.name}", save, on_success=saved)
+
+    @Slot(str)
+    def exportSelectedMsp(self, url: str):
+        lib = self._manager.selected_library()
+        if lib is None:
+            return
+        path = Path(to_local_path(url))
+        if path.suffix.lower() != ".msp":
+            path = path.with_name(path.name + ".msp")
+
+        def exported(n):
+            self.infoMessage.emit(f"Exported {n} spectra to {path.name}.")
+        self._run(f"Exporting {path.name}", write_msp, lib, path, on_success=exported, progress=True)
+
+    @Slot(str)
+    def mergeIntoSelected(self, url: str):
+        """Copy every compound/spectrum of the library file at ``url`` into
+        the selected library (identical spectra are skipped)."""
+        lib = self._manager.selected_library()
+        if lib is None:
+            return
+        source = Path(to_local_path(url))
+        key = self.selectedKey
+
+        def merged(counts):
+            self.libraryContentChanged.emit(key)
+            self.refresh(key)
+            self.infoMessage.emit(
+                f"Merged {source.name}: {counts['spectra_added']} spectra added "
+                f"({counts['compounds_added']} new compounds), {counts['spectra_skipped']} identical spectra skipped.")
+        self._run(f"Merging {source.name}", lib.merge_from, source, on_success=merged)
 
     @Slot(str)
     def renameSelected(self, name: str):

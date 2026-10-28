@@ -11,8 +11,9 @@ src/libviz/
     readers/msp_reader.py bulk MSP import
     readers/mzml_reader.py streaming MS2 reader (lxml), decodes only kept scans
     builder.py            target list + mzML -> candidate spectra -> commit (ADR 4)
+    writers/msp_writer.py streaming MSP export (ADR 5)
     utils/                MSP parsing, mass/adduct maths, logging
-  cli/     command line (no Qt): libviz convert | build | info
+  cli/     command line (no Qt): libviz convert | build | export | merge | info
   gui/     PySide6 + QML (ADR 2)
     main.py            build_engine() / main(); QML loaded from gui/qml/
     worker.py          Task: the one background-thread runner

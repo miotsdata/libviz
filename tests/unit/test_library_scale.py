@@ -57,3 +57,22 @@ def test_browse_queries_stay_interactive(tmp_path):
     print(timings)
     slow = {k: round(v, 3) for k, v in timings.items() if v > 1.0}
     assert not slow, slow
+
+
+@pytest.mark.slow
+def test_export_and_merge_scale(tmp_path):
+    from libviz.core.writers import write_msp
+    lib = build_big_library(tmp_path / "big.db")
+    lib.is_temp = False
+
+    t = time.perf_counter()
+    assert write_msp(lib, tmp_path / "big.msp") == N_SPECTRA
+    export = time.perf_counter() - t
+
+    target = Library.create(tmp_path / "target.db", name="target")
+    t = time.perf_counter()
+    counts = target.merge_from(lib.path)
+    merge = time.perf_counter() - t
+    print({"export": export, "merge": merge})
+    assert counts["spectra_added"] == N_SPECTRA
+    assert export < 120 and merge < 60

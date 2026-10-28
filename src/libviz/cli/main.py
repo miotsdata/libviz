@@ -1,4 +1,5 @@
-"""``libviz`` command line: the core operations without the GUI."""
+"""``libviz`` command line: the core operations without the GUI
+(convert, build, export, merge, info)."""
 import argparse
 import logging
 import sys
@@ -6,6 +7,7 @@ from pathlib import Path
 
 from libviz.core import builder
 from libviz.core.library import Library
+from libviz.core.writers import write_msp
 from libviz.core.utils.logging_utils import configure_logging
 
 
@@ -72,6 +74,25 @@ def cmd_build(args) -> int:
     return 0
 
 
+def cmd_export(args) -> int:
+    lib = Library.load_from_db(args.library)
+    out = args.output or args.library.with_suffix(".msp")
+    n = write_msp(lib, out, progress=_progress("Exporting"))
+    print(file=sys.stderr)
+    print(f"{out}: {n} spectra")
+    return 0
+
+
+def cmd_merge(args) -> int:
+    lib = _open_or_create(args.target, None)
+    for source in args.sources:
+        counts = lib.merge_from(source)
+        print(f"{source}: +{counts['spectra_added']} spectra (+{counts['compounds_added']} compounds), "
+              f"{counts['spectra_skipped']} identical skipped")
+    print(f"{args.target}: {lib.n_compounds} compounds, {lib.n_spectra} spectra")
+    return 0
+
+
 def cmd_info(args) -> int:
     lib = Library.load_from_db(args.library)
     options = lib.filter_options()
@@ -116,6 +137,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--replace", action="store_true", help="replace existing spectra with the same key")
     p.add_argument("-n", "--dry-run", action="store_true")
     p.set_defaults(func=cmd_build)
+
+    p = sub.add_parser("export", help="LibViz .db -> MSP")
+    p.add_argument("library", type=Path)
+    p.add_argument("-o", "--output", type=Path, help="default: next to the library, .msp")
+    p.set_defaults(func=cmd_export)
+
+    p = sub.add_parser("merge", help="copy libraries into TARGET (created if missing), skipping identical spectra")
+    p.add_argument("target", type=Path)
+    p.add_argument("sources", type=Path, nargs="+")
+    p.set_defaults(func=cmd_merge)
 
     p = sub.add_parser("info", help="summary of a library")
     p.add_argument("library", type=Path)

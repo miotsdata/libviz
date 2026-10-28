@@ -4,7 +4,8 @@ Build, inspect and curate MS/MS spectral libraries.
 
 - **Build** libraries from mzML files (DDA, DIA, imaging) and a target list: one spectrum per compound/adduct/CE, you pick the best scan.
 - **Import** MSP libraries (MoNA, MS-DIAL, NIST-style exports).
-- **Inspect** libraries: browse compounds and spectra, view spectra.
+- **Inspect** libraries: search compounds, view spectra and metadata, even with 500k+ spectra.
+- **Curate**: edit/delete compounds, spectra and metadata; export MSP; merge libraries.
 
 ## Install
 

@@ -109,6 +109,7 @@ ApplicationWindow {
             }
             MenuSeparator {}
             Action { text: qsTr("&Save as…"); shortcut: StandardKey.SaveAs; enabled: window.hasSelection && !Libraries.busy; onTriggered: saveAsDialog.open() }
+            Action { text: qsTr("&Export as MSP…"); shortcut: "Ctrl+E"; enabled: window.hasSelection && !Libraries.busy; onTriggered: exportMspDialog.open() }
             Action { text: qsTr("&Close library"); shortcut: StandardKey.Close; enabled: window.hasSelection && !Libraries.busy; onTriggered: window.requestClose(Libraries.selectedKey) }
             MenuSeparator {}
             Action { text: qsTr("&Quit"); shortcut: StandardKey.Quit; onTriggered: window.close() }
@@ -118,6 +119,7 @@ ApplicationWindow {
             Action { text: qsTr("&Build from mzML…"); shortcut: "Ctrl+B"; onTriggered: window.openBuilder() }
             MenuSeparator {}
             Action { text: qsTr("&Rename…"); enabled: window.hasSelection && !Libraries.busy; onTriggered: renameDialog.openWith(Libraries.selected.name) }
+            Action { text: qsTr("&Merge another library into this…"); enabled: window.hasSelection && !Libraries.busy; onTriggered: mergeDialog.open() }
         }
         Menu {
             title: qsTr("&View")
@@ -214,6 +216,7 @@ ApplicationWindow {
             window.commitAfterCreate = false
         }
         function onErrorOccurred(message) { window.showError(message); window.commitAfterCreate = false }
+        function onInfoMessage(message) { infoDialog.text = message; infoDialog.open() }
         function onSelectedChanged() {
             if (window.hasSelection && !Libraries.selected.isTemp && Libraries.selected.path)
                 window.addRecent(Libraries.selected.path)
@@ -289,6 +292,31 @@ ApplicationWindow {
         defaultSuffix: "db"
         nameFilters: [qsTr("LibViz libraries (*.db)")]
         onAccepted: Libraries.saveSelectedAs(selectedFile)
+    }
+
+    FileDialog {
+        id: exportMspDialog
+        title: qsTr("Export library as MSP")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "msp"
+        nameFilters: [qsTr("MSP files (*.msp)")]
+        onAccepted: Libraries.exportSelectedMsp(selectedFile)
+    }
+    FileDialog {
+        id: mergeDialog
+        title: qsTr("Merge library into “%1”").arg(Libraries.selected.name || "")
+        nameFilters: [qsTr("LibViz libraries (*.db)"), qsTr("All files (*)")]
+        onAccepted: { mergeConfirm.source = selectedFile; mergeConfirm.open() }
+    }
+    MessageDialog {
+        id: mergeConfirm
+        property string source
+        title: qsTr("Merge libraries")
+        text: qsTr("Copy all compounds and spectra of %1 into “%2”? Identical spectra are skipped.")
+              .arg(Libraries.toLocalPath(source)).arg(Libraries.selected.name || "")
+        informativeText: Libraries.selected.isTemp ? "" : qsTr("The library file is changed directly.")
+        buttons: MessageDialog.Ok | MessageDialog.Cancel
+        onButtonClicked: (button, role) => { if (button === MessageDialog.Ok) Libraries.mergeIntoSelected(source) }
     }
 
     Dialog {

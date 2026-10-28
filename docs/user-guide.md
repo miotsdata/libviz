@@ -13,6 +13,8 @@ to close it.
 | Import an MSP file | File › Import MSP… (Ctrl+I) | The import is **unsaved** until you use *Save as*. |
 | Save as | File › Save as… (Ctrl+Shift+S) | Copies the library to a new `.db`; later edits go there. |
 | Rename | Library › Rename… | The name is stored inside the file. |
+| Export as MSP | File › Export as MSP… (Ctrl+E) | Every spectrum, with its metadata. |
+| Merge | Library › Merge another library into this… | Copies compounds and spectra from a `.db`; identical spectra are skipped. |
 | Theme | View › Dark theme | Remembered across sessions. |
 
 Closing an unsaved import, or quitting with one open, asks before
@@ -36,6 +38,23 @@ discarding it.
     `m/z<TAB>intensity` lines.
   - Compound identifiers (InChIKey, SMILES, PubChem link) and every metadata
     field stored with the spectrum.
+
+## Curating
+
+- **Edit a compound:** right-click it in the table, or use the **⋯** button
+  next to its name, then *Edit compound…*. You can change the name,
+  formula, SMILES and PubChem CID. The InChIKey identifies the compound and
+  cannot be edited.
+- **Delete:**
+  - *Delete compound…* removes the compound and all its spectra.
+  - Right-click a spectrum in the spectra list and choose *Delete
+    spectrum…* to remove just that spectrum.
+- **Spectrum metadata:** *Add field…* adds one. Use ✎ to edit a field and
+  ✕ to delete it.
+- **Export one compound:** *Export as MSP…* in the compound menu.
+
+Changes are written to the library immediately and can't be undone. Use
+*Save as* first if you want to keep the original.
 
 ## Building a library from mzML
 
@@ -84,6 +103,8 @@ discarding it.
 libviz convert MoNA.msp -o mona.db              # MSP -> library
 libviz build targets.csv run1.mzML run2.mzML -o standards.db --ppm 5
 libviz build targets.csv dia.mzML -o lib.db --include-multiplexed --replace
+libviz export standards.db -o standards.msp
+libviz merge all.db standards.db mona.db         # all.db is created if missing
 libviz info standards.db
 ```
 
