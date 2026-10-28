@@ -2,13 +2,15 @@ import importlib.metadata
 import logging
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent
 from PySide6.QtQuickControls2 import QQuickStyle
 
+from libviz.core.library import Library
 from libviz.core.utils.logging_utils import configure_logging
 from libviz.gui.builder_bridge import BuilderBridge
 from libviz.gui.inspector_bridge import InspectorBridge
@@ -64,6 +66,18 @@ def main() -> int:
 
     bridges = make_bridges()
     engine = build_engine(bridges)  # noqa: F841  (must outlive app.exec)
+    if os.environ.get("LIBVIZ_SMOKE_TEST"):
+        # Release builds: prove every view compiles (pages load lazily, so a
+        # missing QML module would otherwise only show up later) and the
+        # bundled migrations run.
+        for qml in sorted((QML_DIR / "Views").glob("*.qml")):
+            component = QQmlComponent(engine, QUrl.fromLocalFile(str(qml)))
+            if component.isError():
+                raise RuntimeError(f"{qml.name}: {component.errorString()}")
+        with tempfile.TemporaryDirectory() as tmp:
+            Library.create(Path(tmp) / "smoke.db", name="smoke").close()
+        print("LIBVIZ_SMOKE_TEST ok", flush=True)
+        os._exit(0)
     exit_code = app.exec()
     # Delete temp (unsaved, already confirmed in Main.qml) import DBs.
     for lib in bridges["Libraries"].manager.libraries.values():

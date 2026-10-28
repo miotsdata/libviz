@@ -1,0 +1,8 @@
+#!/bin/bash
+# packaging/appimage/AppRun — AppImage entry point.
+#
+# The PyInstaller onedir bundle (exe + its _internal/ sibling) is copied
+# whole into usr/opt/libviz-gui/: the exe finds _internal/ relative to
+# itself, so keeping the pair intact avoids fighting PyInstaller's paths.
+HERE="$(dirname "$(readlink -f "${0}")")"
+exec "${HERE}/usr/opt/libviz-gui/libviz-gui" "$@"

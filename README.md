@@ -37,4 +37,6 @@ pdm install -G :all
 pdm run pytest
 ```
 
-Docs: [user guide](docs/user-guide.md), [architecture](docs/architecture.md), [decisions](docs/adr/), [changelog](CHANGELOG.md).
+CI runs the tests on every push/PR to `develop`/`master`. Standalone builds (Windows installer, Linux AppImage) and the PyPI upload come from `release-builds.yml`; see [releasing](docs/release.md).
+
+Docs: [user guide](docs/user-guide.md), [architecture](docs/architecture.md), [decisions](docs/adr/), [releasing](docs/release.md), [changelog](CHANGELOG.md).

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=LibViz
+Comment=Build, inspect and search MS/MS spectral libraries
+Exec=libviz-gui
+Icon=libviz
+Categories=Science;
+Terminal=false

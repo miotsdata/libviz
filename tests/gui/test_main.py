@@ -1,3 +1,7 @@
+import os
+import subprocess
+import sys
+
 from PySide6.QtCore import QObject
 
 from libviz.gui.main import build_engine, make_bridges
@@ -48,3 +52,13 @@ def test_every_page_loads_without_warnings(qtbot, msp_file):
     window.setProperty("page", "")
     qtbot.wait(100)
     assert [w.toString() for w in warnings] == []
+
+
+def test_smoke_test_mode_exits_cleanly(tmp_path):
+    """What the release builds run on the frozen app (ADR 7)."""
+    env = {**os.environ, "LIBVIZ_SMOKE_TEST": "1", "QT_QPA_PLATFORM": "offscreen",
+           "XDG_CONFIG_HOME": str(tmp_path)}
+    run = subprocess.run([sys.executable, "-m", "libviz.gui.main"], env=env,
+                         capture_output=True, text=True, timeout=120)
+    assert run.returncode == 0, run.stderr[-2000:]
+    assert "LIBVIZ_SMOKE_TEST ok" in run.stdout
