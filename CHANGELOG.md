@@ -12,6 +12,8 @@
 ### Added
 - New desktop GUI shell (ADR 2): menubar, sidebar of open libraries, status bar with progress, light/dark theme, recent libraries, unsaved-library and quit confirmations. Launch with `libviz-gui`.
 - MSP import reports progress.
+- Library inspector (ADR 3): search by name/formula/InChIKey or mass ± ppm, polarity/adduct/CE filters, sortable paged compound table that stays fast on 500k-spectrum libraries, spectra list, interactive spectrum plot, compound identifiers and spectrum metadata, copy peaks.
+- `Library.search_compounds`, `count_compounds`, `filter_options`, `get_compound`, `get_compound_spectra`, `get_spectrum`.
 
 ### Changed
 - `Library.loadFromMSP` → `Library.load_from_msp`; an imported MSP library is named after the file.

@@ -33,4 +33,4 @@ pdm install -G :all
 pdm run pytest
 ```
 
-Docs: [architecture](docs/architecture.md), [decisions](docs/adr/), [changelog](CHANGELOG.md).
+Docs: [user guide](docs/user-guide.md), [architecture](docs/architecture.md), [decisions](docs/adr/), [changelog](CHANGELOG.md).

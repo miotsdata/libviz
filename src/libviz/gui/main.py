@@ -10,6 +10,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
 from libviz.core.utils.logging_utils import configure_logging
+from libviz.gui.inspector_bridge import InspectorBridge
 from libviz.gui.library_bridge import LibraryBridge
 
 # QML is loaded straight from the package directory, not compiled into a
@@ -44,7 +45,8 @@ def build_engine(bridges: dict[str, object]) -> QQmlApplicationEngine:
 
 
 def make_bridges() -> dict[str, object]:
-    return {"Libraries": LibraryBridge()}
+    libraries = LibraryBridge()
+    return {"Libraries": libraries, "Inspector": InspectorBridge(libraries)}
 
 
 def main() -> int:

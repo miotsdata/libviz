@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from pathlib import Path
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, exists, func, or_, select
 from sqlalchemy.orm import sessionmaker
 import numpy as np
 import logging
@@ -386,3 +386,120 @@ class Library:
                 }
                 for s, c in query.all()
             ]
+
+
+    # ---------- Browsing (inspector) ----------
+    # Everything below is paged/filtered in SQL so it stays fast on
+    # MoNA-sized libraries (500k+ spectra); see ADR 3.
+
+    COMPOUND_SORT_KEYS = ("name", "formula", "exact_mass", "inchikey")
+
+    def _compound_filters(self, text: str = "", mass: float | None = None, ppm: float = 10.0,
+                          polarity: str | None = None, adduct: str | None = None,
+                          collision_energy: float | None = None) -> list:
+        conditions = []
+        text = (text or "").strip()
+        if text:
+            like = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            conditions.append(or_(
+                Compound.name.like(f"%{like}%", escape="\\"),
+                Compound.inchikey.like(f"{like.upper()}%", escape="\\"),
+                Compound.formula == text,
+            ))
+        if mass is not None and mass > 0:
+            tol = mass * ppm / 1e6
+            conditions.append(or_(
+                Compound.exact_mass.between(mass - tol, mass + tol),
+                exists().where(Spectrum.compound_id == Compound.id,
+                               Spectrum.precursor_mz.between(mass - tol, mass + tol)),
+            ))
+        spectrum_conditions = []
+        if polarity:
+            spectrum_conditions.append(Spectrum.polarity == polarity)
+        if adduct:
+            spectrum_conditions.append(Spectrum.adduct_type_id.in_(
+                select(AdductType.id).where(AdductType.formula == adduct)))
+        if collision_energy is not None:
+            spectrum_conditions.append(Spectrum.collision_energy == collision_energy)
+        if spectrum_conditions:
+            conditions.append(exists().where(Spectrum.compound_id == Compound.id, *spectrum_conditions))
+        return conditions
+
+    def count_compounds(self, **filters) -> int:
+        with self.session_scope() as session:
+            return session.query(func.count(Compound.id)).filter(*self._compound_filters(**filters)).scalar()
+
+    def search_compounds(self, *, sort: str = "name", descending: bool = False,
+                         offset: int = 0, limit: int = 200, **filters) -> list[dict]:
+        """One page of compounds matching ``filters`` (see ``_compound_filters``)."""
+        if sort not in self.COMPOUND_SORT_KEYS:
+            raise ValueError(f"sort must be one of {self.COMPOUND_SORT_KEYS}")
+        column = getattr(Compound, sort)
+        n_spectra = (select(func.count(Spectrum.id)).where(Spectrum.compound_id == Compound.id)
+                     .correlate(Compound).scalar_subquery())
+        with self.session_scope() as session:
+            rows = (
+                session.query(Compound.id, Compound.name, Compound.formula, Compound.exact_mass,
+                              Compound.inchikey, n_spectra)
+                .filter(*self._compound_filters(**filters))
+                .order_by(column.desc() if descending else column.asc(), Compound.id)
+                .offset(offset).limit(limit)
+                .all()
+            )
+        return [{"id": r[0], "name": r[1] or "", "formula": r[2] or "", "exact_mass": r[3],
+                 "inchikey": r[4] or "", "n_spectra": r[5]} for r in rows]
+
+    def filter_options(self) -> dict:
+        """Distinct polarities, adducts and collision energies actually used."""
+        with self.session_scope() as session:
+            polarities = [p for (p,) in session.query(Spectrum.polarity).distinct() if p]
+            adducts = [a for (a,) in session.query(AdductType.formula)
+                       .filter(exists().where(Spectrum.adduct_type_id == AdductType.id))
+                       .order_by(AdductType.formula)]
+            energies = [e for (e,) in session.query(Spectrum.collision_energy).distinct()
+                        .order_by(Spectrum.collision_energy) if e is not None]
+        return {"polarities": sorted(polarities), "adducts": adducts, "collision_energies": energies}
+
+    def get_compound(self, compound_id: int) -> dict:
+        with self.session_scope() as session:
+            c = session.get(Compound, compound_id)
+            if c is None:
+                raise ValueError(f"Compound with ID {compound_id} not found")
+            return {"id": c.id, "name": c.name or "", "formula": c.formula or "",
+                    "exact_mass": c.exact_mass, "inchikey": c.inchikey or "",
+                    "smiles": c.smiles or "", "pubchem_id": c.pubchem_id}
+
+    def get_compound_spectra(self, compound_id: int) -> list[dict]:
+        """Spectrum summaries (no peak arrays) of one compound."""
+        with self.session_scope() as session:
+            rows = (
+                session.query(Spectrum.id, Spectrum.precursor_mz, AdductType.formula, Spectrum.polarity,
+                              Spectrum.collision_energy, func.length(Spectrum.mz_array) / 4, Spectrum.added_on)
+                .join(AdductType, AdductType.id == Spectrum.adduct_type_id)
+                .filter(Spectrum.compound_id == compound_id)
+                .order_by(Spectrum.polarity, AdductType.formula, Spectrum.collision_energy, Spectrum.id)
+                .all()
+            )
+        return [{"id": r[0], "precursor_mz": r[1], "adduct": r[2] or "", "polarity": r[3] or "",
+                 "collision_energy": r[4], "n_peaks": int(r[5] or 0),
+                 "added_on": r[6].isoformat(timespec="seconds") if r[6] else ""} for r in rows]
+
+    def get_spectrum(self, spectrum_id: int) -> dict:
+        """One spectrum with peaks (plain lists) and its key/value metadata."""
+        with self.session_scope() as session:
+            s = session.get(Spectrum, spectrum_id)
+            if s is None:
+                raise ValueError(f"Spectrum with ID {spectrum_id} not found")
+            return {
+                "id": s.id,
+                "compound_id": s.compound_id,
+                "precursor_mz": s.precursor_mz,
+                "adduct": s.adduct_type.formula if s.adduct_type else "",
+                "polarity": s.polarity or "",
+                "collision_energy": s.collision_energy,
+                "mz": s.mz_numpy().astype(float).tolist(),
+                "intensity": s.intensity_numpy().astype(float).tolist(),
+                "metadata": {m.key: m.value for m in s.spectrum_metadata},
+                "added_on": s.added_on.isoformat(timespec="seconds") if s.added_on else "",
+            }
+

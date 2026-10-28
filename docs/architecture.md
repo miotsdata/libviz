@@ -15,6 +15,8 @@ src/libviz/
     main.py            build_engine() / main(); QML loaded from gui/qml/
     worker.py          Task: the one background-thread runner
     library_bridge.py  `Libraries` context property: open/import/save/close
+    inspector_bridge.py `Inspector`: filters, selected compound/spectra/spectrum
+    compound_model.py  paged, virtual compound table model (ADR 3)
     qml/Main.qml       window, menubar, sidebar, status bar, dialogs
     qml/Style/         Theme singleton (light/dark tokens)
     qml/Views/         pages and panels

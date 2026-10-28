@@ -48,3 +48,8 @@ dev = [
     "pytest-qt>=4.5.0",
     "archunitpython>=1.8.1",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = ["slow: big-library performance tests (run with -m slow)"]

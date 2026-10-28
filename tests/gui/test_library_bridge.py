@@ -8,8 +8,8 @@ from libviz.gui.library_bridge import LibraryBridge, to_local_path
 
 
 @pytest.fixture
-def bridge():
-    b = LibraryBridge()
+def bridge(qapp):
+    b = LibraryBridge(parent=qapp)  # outlives its Tasks, like in production
     yield b
     for lib in b.manager.libraries.values():
         lib.close()

@@ -37,7 +37,8 @@ QtObject {
     readonly property color plotTextColor: textColor
     readonly property color plotAccentColor: isDark ? "#5aa9e6" : "#1f77b4"
     readonly property color plotSecondColor: isDark ? "#e5a35a" : "#d62728"
-    readonly property color plotMutedColor: isDark ? "#7a7a7a" : "#9a9a9a"
+    readonly property color plotStrongColor: isDark ? "#e0e0e0" : "#000000"
+    readonly property color plotWeakColor: isDark ? "#7a7a7a" : "#999999"
 
     // Type / spacing
     readonly property int headingPixelSize: 18
