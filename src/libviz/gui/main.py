@@ -13,6 +13,7 @@ from libviz.core.utils.logging_utils import configure_logging
 from libviz.gui.builder_bridge import BuilderBridge
 from libviz.gui.inspector_bridge import InspectorBridge
 from libviz.gui.library_bridge import LibraryBridge
+from libviz.gui.search_bridge import SearchBridge
 
 # QML is loaded straight from the package directory, not compiled into a
 # qrc module: no rcc step, no generated file to keep in sync (ADR 2).
@@ -48,7 +49,7 @@ def build_engine(bridges: dict[str, object]) -> QQmlApplicationEngine:
 def make_bridges() -> dict[str, object]:
     libraries = LibraryBridge()
     return {"Libraries": libraries, "Inspector": InspectorBridge(libraries),
-            "Builder": BuilderBridge(libraries)}
+            "Builder": BuilderBridge(libraries), "Search": SearchBridge(libraries)}
 
 
 def main() -> int:

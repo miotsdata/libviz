@@ -12,6 +12,7 @@ src/libviz/
     readers/mzml_reader.py streaming MS2 reader (lxml), decodes only kept scans
     builder.py            target list + mzML -> candidate spectra -> commit (ADR 4)
     writers/msp_writer.py streaming MSP export (ADR 5)
+    similarity.py         greedy (modified) cosine, peak-list parsing (ADR 6)
     utils/                MSP parsing, mass/adduct maths, logging
   cli/     command line (no Qt): libviz convert | build | export | merge | info
   gui/     PySide6 + QML (ADR 2)
@@ -22,6 +23,7 @@ src/libviz/
     compound_model.py  paged, virtual compound table model (ADR 3)
     builder_bridge.py  `Builder`: setup / run / review / commit (ADR 4)
     dict_model.py      list model with in-place row updates
+    search_bridge.py   `Search`: spectral search across open libraries (ADR 6)
     qml/Main.qml       window, menubar, sidebar, status bar, dialogs
     qml/Style/         Theme singleton (light/dark tokens)
     qml/Views/         pages and panels
@@ -49,3 +51,9 @@ cycles.
 ## Decisions
 
 Architecture decision records are in [`docs/adr/`](adr/).
+
+## Pages
+
+`Main.qml`'s `page` property picks the content: `""` shows the selected
+library's page (Browse / Overview tabs), or the welcome page when nothing is
+selected. `"builder"` shows BuilderPage and `"search"` shows SearchPage.

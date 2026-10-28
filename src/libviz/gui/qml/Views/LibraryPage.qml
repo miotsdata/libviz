@@ -28,6 +28,7 @@ Item {
             searchField.text = ""; massField.text = ""
             polarityBox.currentIndex = 0; adductBox.currentIndex = 0; ceBox.currentIndex = 0
             debounce.stop()
+            tabs.currentIndex = 0
         }
     }
     Timer { id: debounce; interval: 300; onTriggered: page.applyFilters() }
@@ -56,8 +57,20 @@ Item {
             }
         }
 
+        TabBar {
+            id: tabs
+            objectName: "libraryTabs"
+            Layout.leftMargin: 10
+            TabButton { text: qsTr("Browse"); width: implicitWidth + 20 }
+            TabButton { text: qsTr("Overview"); width: implicitWidth + 20 }
+            onCurrentIndexChanged: if (currentIndex === 1) Inspector.loadOverview()
+        }
+        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderColor }
+
         // --- filter bar ---
         RowLayout {
+            visible: tabs.currentIndex === 0
+            Layout.topMargin: 8
             Layout.fillWidth: true
             Layout.leftMargin: 10
             Layout.rightMargin: 10
@@ -108,12 +121,27 @@ Item {
                 model: [qsTr("Any CE")].concat(page.options.collision_energies || [])
                 onActivated: page.applyFilters()
             }
-            ToolButton { text: qsTr("Clear"); onClicked: page.clearFilters() }
+            ToolButton { text: qsTr("Clear"); onClicked: { Inspector.setIssue(""); page.clearFilters() } }
+        }
+        RowLayout {
+            visible: tabs.currentIndex === 0 && Inspector.issue !== ""
+            Layout.leftMargin: 10
+            Layout.bottomMargin: 6
+            Label { text: "⚠ " + qsTr("Only %1").arg(Inspector.issueLabel); color: Theme.warningColor }
+            ToolButton { text: "✕"; onClicked: Inspector.setIssue("") }
         }
 
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderColor }
 
+        OverviewPanel {
+            visible: tabs.currentIndex === 1
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            onShowIssue: key => { Inspector.setIssue(key); tabs.currentIndex = 0 }
+        }
+
         SplitView {
+            visible: tabs.currentIndex === 0
             Layout.fillWidth: true
             Layout.fillHeight: true
             orientation: Qt.Horizontal
@@ -136,6 +164,7 @@ Item {
                 onDeleteSpectrumRequested: id => confirmDialog.ask(qsTr("Delete this spectrum?"), function () { Inspector.deleteSpectrum(id) })
                 onEditMetadataRequested: (key, value) => metadataDialog.openFor(key, value)
                 onDeleteMetadataRequested: key => Inspector.deleteMetadata(key)
+                onSearchSimilarRequested: { Search.useSpectrum(Inspector.spectrum, Inspector.compound.name); window.page = "search" }
             }
         }
     }

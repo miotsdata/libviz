@@ -2,6 +2,7 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 
 from libviz.gui.compound_model import CompoundTableModel
+from libviz.core.similarity import cosine
 from libviz.core.writers import write_msp
 from libviz.gui.library_bridge import LibraryBridge, to_local_path
 from libviz.gui.worker import start_task
@@ -26,6 +27,9 @@ class InspectorBridge(QObject):
     workers; a late answer for something no longer selected is dropped."""
 
     filterOptionsChanged = Signal()
+    overviewChanged = Signal()
+    comparisonChanged = Signal()
+    issueChanged = Signal()
     compoundChanged = Signal()
     spectraChanged = Signal()
     spectrumChanged = Signal()
@@ -41,6 +45,9 @@ class InspectorBridge(QObject):
         self._compound: dict = {}
         self._spectra: list = []
         self._spectrum: dict = {}
+        self._overview: dict = {}
+        self._comparison: dict = {}
+        self._issue = ""
         # Only the newest compound/spectrum request is applied (fast clicking).
         self._compound_request = 0
         self._spectrum_request = 0
@@ -61,20 +68,27 @@ class InspectorBridge(QObject):
         if key == self._key:
             return
         self._key = key
+        self._issue = ""
+        self.issueChanged.emit()
         self._model.set_library(self._lib)
         self._clear_selection()
         self._load_filter_options()
+        self._overview = {}
+        self.overviewChanged.emit()
 
     def _on_content_changed(self, key: str):
         if key != self._key:
             return
         self._model.reload()
         self._load_filter_options()
+        if self._overview:
+            self.loadOverview()
         if self._compound:
             self._load_compound(self._compound["id"], keep_spectrum=True)
 
     def _clear_selection(self):
-        self._compound, self._spectra, self._spectrum = {}, [], {}
+        self._compound, self._spectra, self._spectrum, self._comparison = {}, [], {}, {}
+        self.comparisonChanged.emit()
         self.compoundChanged.emit()
         self.spectraChanged.emit()
         self.spectrumChanged.emit()
@@ -149,7 +163,69 @@ class InspectorBridge(QObject):
             "polarity": polarity or None,
             "adduct": adduct or None,
             "collision_energy": parse_float(collision_energy),
+            "issue": self._issue or None,
         })
+
+    # --- overview / QC (ADR 6) -----------------------------------------------
+
+    @Property("QVariantMap", notify=overviewChanged)
+    def overview(self) -> dict:
+        return self._overview
+
+    @Slot()
+    def loadOverview(self):
+        lib, key = self._lib, self._key
+        if lib is None:
+            return
+
+        def loaded(overview):
+            if key == self._key:
+                self._overview = overview
+                self.overviewChanged.emit()
+        start_task(self, lib.overview, on_success=loaded, on_error=self._error_for(key))
+
+    @Property(str, notify=issueChanged)
+    def issue(self) -> str:
+        return self._issue
+
+    @Property(str, notify=issueChanged)
+    def issueLabel(self) -> str:
+        from libviz.core.library import Library
+        return Library.ISSUES.get(self._issue, "")
+
+    @Slot(str)
+    def setIssue(self, issue: str):
+        """Restrict the table to compounds with a QC issue ("" = none)."""
+        self._issue = issue
+        self.issueChanged.emit()
+        self._model.set_filters({**self._model._filters, "issue": issue or None})  # pylint: disable=protected-access
+
+    # --- compare --------------------------------------------------------------
+
+    @Property("QVariantMap", notify=comparisonChanged)
+    def comparison(self) -> dict:
+        return self._comparison
+
+    @Slot(int)
+    def compareWith(self, spectrum_id: int):
+        """Mirror the selected spectrum against another one, with cosine."""
+        lib, key, base = self._lib, self._key, self._spectrum
+        if lib is None or not base:
+            return
+
+        def loaded(other):
+            if key != self._key or self._spectrum.get("id") != base["id"]:
+                return
+            match = cosine(base["mz"], base["intensity"], other["mz"], other["intensity"])
+            self._comparison = {"spectrum": other, "score": match.score, "n_matched": match.n_matched,
+                                "label": f"{other['adduct']} {other['polarity']} CE {other['collision_energy']:g}"}
+            self.comparisonChanged.emit()
+        start_task(self, lib.get_spectrum, spectrum_id, on_success=loaded, on_error=self._error_for(key))
+
+    @Slot()
+    def clearComparison(self):
+        self._comparison = {}
+        self.comparisonChanged.emit()
 
     @Slot(int)
     def selectCompoundRow(self, row: int):
@@ -172,6 +248,9 @@ class InspectorBridge(QObject):
 
         def loaded(spectrum):
             if key == self._key and request == self._spectrum_request:
+                if self._comparison.get("spectrum", {}).get("id") == spectrum["id"]:
+                    self._comparison = {}
+                    self.comparisonChanged.emit()
                 self._spectrum = spectrum
                 self.spectrumChanged.emit()
         start_task(self, lib.get_spectrum, spectrum_id, on_success=loaded, on_error=self._error_for(key))

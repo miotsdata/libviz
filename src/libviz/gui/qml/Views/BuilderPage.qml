@@ -431,6 +431,7 @@ Item {
                             mirrored: compare
                             yMin: compare ? -1100 : NaN
                             yMax: compare ? 1100 : NaN
+                            yTickInterval: compare ? 500 : 0
                             yTitle: qsTr("Relative intensity")
                         }
                     }

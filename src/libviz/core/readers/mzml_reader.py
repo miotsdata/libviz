@@ -180,3 +180,16 @@ def iter_ms2(path: Path, keep: Callable[[Ms2Scan], bool] = lambda scan: True,
                 progress(n, total)
     if progress:
         progress(total, total)
+
+
+def read_scan(path: Path, scan: int | str) -> Ms2Scan:
+    """One MS2 scan by number: matches ``scan=N`` in the native id (Thermo,
+    msconvert), else the 0-based spectrum index."""
+    scan = str(scan).strip()
+    token = f"scan={scan}"
+
+    def wanted(s: Ms2Scan) -> bool:
+        return token in s.scan_id.split() or s.scan_id == scan or str(s.index) == scan
+    for s in iter_ms2(Path(path), wanted):
+        return s
+    raise ValueError(f"no MS2 scan {scan} in {Path(path).name}")

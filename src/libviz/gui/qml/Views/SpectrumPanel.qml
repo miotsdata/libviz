@@ -16,6 +16,14 @@ SplitView {
     signal deleteSpectrumRequested(int spectrumId)
     signal editMetadataRequested(string key, string value)  // key "" = new field
     signal deleteMetadataRequested(string key)
+    signal searchSimilarRequested()
+    readonly property var comparison: Inspector.comparison
+    readonly property bool comparing: comparison.spectrum !== undefined
+    function scaled(sp, sign) {
+        if (!sp || !sp.mz || !sp.mz.length) return []
+        var top = Math.max.apply(null, sp.intensity)
+        return sp.mz.map(function (m, i) { return [m, sign * sp.intensity[i] / top * 1000] })
+    }
 
     function fmt(v, digits) { return v === undefined || v === null ? "—" : Number(v).toFixed(digits) }
 
@@ -87,10 +95,15 @@ SplitView {
                 onClicked: Inspector.selectSpectrum(modelData.id)
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    onTapped: { Inspector.selectSpectrum(srow.modelData.id); spectrumMenu.popup() }
+                    onTapped: spectrumMenu.popup()
                 }
                 Menu {
                     id: spectrumMenu
+                    MenuItem {
+                        text: qsTr("Compare with the selected spectrum")
+                        enabled: srow.modelData.id !== root.spectrum.id
+                        onTriggered: Inspector.compareWith(srow.modelData.id)
+                    }
                     MenuItem { text: qsTr("Delete spectrum…"); onTriggered: root.deleteSpectrumRequested(srow.modelData.id) }
                 }
                 contentItem: Row {
@@ -129,7 +142,19 @@ SplitView {
                         + "  ·  precursor m/z " + root.fmt(root.spectrum.precursor_mz, 4)
                         + "  ·  " + (root.spectrum.mz ? root.spectrum.mz.length : 0) + qsTr(" peaks") : ""
             }
+            ToolButton { text: qsTr("Search similar"); onClicked: root.searchSimilarRequested() }
             ToolButton { text: qsTr("Copy peaks"); onClicked: Inspector.copyPeaks() }
+        }
+        RowLayout {
+            visible: root.comparing
+            Layout.fillWidth: true
+            Layout.leftMargin: 8
+            Label {
+                Layout.fillWidth: true
+                text: root.comparing ? qsTr("Cosine %1 · %2 matched peaks · bottom: %3")
+                                       .arg(root.comparison.score.toFixed(3)).arg(root.comparison.n_matched).arg(root.comparison.label) : ""
+            }
+            ToolButton { text: qsTr("Close comparison"); onClicked: Inspector.clearComparison() }
         }
         Rectangle {
             Layout.fillWidth: true
@@ -141,11 +166,15 @@ SplitView {
                 anchors.fill: parent
                 anchors.margins: 4
                 emptyText: root.hasCompound ? qsTr("No peaks") : qsTr("Select a compound to see its spectra")
-                groups: root.spectrum.mz ? [{
-                    key: "peaks", name: "",
-                    peaks: root.spectrum.mz.map(function (m, i) { return [m, root.spectrum.intensity[i]] })
-                }] : []
-                colors: ({ peaks: Theme.plotAccentColor })
+                groups: !root.spectrum.mz ? []
+                        : root.comparing ? [{ key: "peaks", name: qsTr("Selected"), peaks: root.scaled(root.spectrum, 1) },
+                                            { key: "other", name: root.comparison.label, peaks: root.scaled(root.comparison.spectrum, -1) }]
+                        : [{ key: "peaks", name: "", peaks: root.spectrum.mz.map(function (m, i) { return [m, root.spectrum.intensity[i]] }) }]
+                colors: ({ peaks: Theme.plotAccentColor, other: Theme.plotSecondColor })
+                mirrored: root.comparing
+                yMin: root.comparing ? -1100 : NaN
+                yMax: root.comparing ? 1100 : NaN
+                yTickInterval: root.comparing ? 500 : 0
             }
         }
     }

@@ -85,3 +85,29 @@ def test_compound_spectra_and_spectrum(lib):
     assert spectrum["metadata"] == {}
     with pytest.raises(ValueError):
         lib.get_spectrum(999)
+
+
+def test_overview(lib):
+    o = lib.overview()
+    assert (o["n_compounds"], o["n_spectra"]) == (3, 4)
+    assert dict(map(tuple, o["polarity"])) == {"POSITIVE": 3, "NEGATIVE": 1}
+    assert dict(map(tuple, o["adduct"]))["[M+H]+"] == 2
+    assert dict(map(tuple, o["peaks"])) == {"1–2": 4}
+    issues = {i["key"]: i["count"] for i in o["issues"]}
+    assert issues == {"no_spectra": 0, "no_smiles": 3, "few_peaks": 3, "no_polarity": 0, "duplicates": 0}
+
+
+def test_issue_filter(lib):
+    assert lib.count_compounds(issue="few_peaks") == 3
+    with pytest.raises(ValueError):
+        lib.count_compounds(issue="bogus")
+
+
+def test_search_spectrum(lib):
+    hits = lib.search_spectrum([50.0, 60.0], [100.0, 50.0], precursor_mz=195.0877, precursor_ppm=10)
+    assert [h["collision_energy"] for h in hits] == [20.0]  # CE 40 spectrum has 1 peak < min_matched
+    assert hits[0]["score"] == pytest.approx(1.0) and hits[0]["name"] == "Caffeine"
+    assert lib.search_spectrum([50.0, 60.0], [100.0, 50.0], precursor_mz=195.0877, polarity="NEGATIVE") == []
+    analog = lib.search_spectrum([50.0, 60.0], [100.0, 50.0], precursor_mz=190.0, analog_window=20, min_matched=1)
+    assert {h["name"] for h in analog} == {"Caffeine", "Theobromine"}
+    assert sorted(round(h["delta_mz"], 2) for h in analog) == [-10.94, 5.09]

@@ -39,6 +39,40 @@ discarding it.
   - Compound identifiers (InChIKey, SMILES, PubChem link) and every metadata
     field stored with the spectrum.
 
+## Overview and quality checks
+
+The **Overview** tab of a library shows:
+
+- the number of compounds, spectra, adducts and collision energies
+- distributions by polarity, adduct, CE and peaks per spectrum
+- a precursor m/z histogram
+- **Quality checks**: compounds without spectra or SMILES, spectra with
+  ≤ 2 peaks or without polarity, and duplicate spectra. *Show* filters the
+  compound table to the affected compounds. Clear the filter with ✕ or
+  *Clear*.
+
+## Comparing spectra
+
+In the spectra list, right-click a spectrum and choose *Compare with the
+selected spectrum*. The two are drawn as a mirror plot with their cosine
+similarity and the number of matched peaks.
+
+## Spectral search
+
+*Library › Spectral search…* (Ctrl+F), or *Search similar* above a spectrum.
+
+- **Query:** paste peaks (`m/z intensity` per line), *Search similar* from
+  the inspector, or *Load mzML scan…* (file + scan number). The precursor
+  m/z is required.
+- Every open library is searched:
+  - Spectra with a precursor within the ppm tolerance are scored by cosine
+    similarity.
+  - *Analog search* instead uses every precursor within ± the window (Da)
+    and scores with the modified cosine, which also matches fragments
+    shifted by the precursor difference.
+- Click a hit to see the query vs library mirror plot. Double-click it to
+  open the compound in its library.
+
 ## Curating
 
 - **Edit a compound:** right-click it in the table, or use the **⋯** button

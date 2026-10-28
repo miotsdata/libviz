@@ -41,8 +41,10 @@ def test_every_page_loads_without_warnings(qtbot, msp_file):
     qtbot.waitUntil(lambda: bridges["Inspector"].compounds.rowCount() > 0)
     with qtbot.waitSignal(bridges["Inspector"].spectrumChanged, timeout=10_000):
         bridges["Inspector"].selectCompoundRow(0)
-    window.setProperty("showBuilder", True)  # builder page
+    window.setProperty("page", "builder")  # builder page
     qtbot.wait(100)
-    window.setProperty("showBuilder", False)
+    window.setProperty("page", "search")  # search page
+    qtbot.wait(100)
+    window.setProperty("page", "")
     qtbot.wait(100)
     assert [w.toString() for w in warnings] == []

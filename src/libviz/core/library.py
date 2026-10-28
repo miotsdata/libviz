@@ -395,10 +395,34 @@ class Library:
 
     COMPOUND_SORT_KEYS = ("name", "formula", "exact_mass", "inchikey")
 
+    ISSUES = {
+        # QC checks (overview tab); each is a compound filter for the table.
+        "no_spectra": "compounds without spectra",
+        "no_smiles": "compounds without SMILES",
+        "few_peaks": "compounds with a spectrum of ≤ 2 peaks",
+        "no_polarity": "compounds with a spectrum without polarity",
+        "duplicates": "compounds with identical (duplicate) spectra",
+    }
+
+    def _issue_condition(self, issue: str):
+        if issue == "no_spectra":
+            return ~exists().where(Spectrum.compound_id == Compound.id)
+        if issue == "no_smiles":
+            return or_(Compound.smiles.is_(None), Compound.smiles == "")
+        if issue == "few_peaks":
+            return exists().where(Spectrum.compound_id == Compound.id, func.length(Spectrum.mz_array) <= 8)
+        if issue == "no_polarity":
+            return exists().where(Spectrum.compound_id == Compound.id, Spectrum.polarity.is_(None))
+        if issue == "duplicates":
+            dup = (select(Spectrum.compound_id).group_by(Spectrum.compound_id, Spectrum.spectrum_hash)
+                   .having(func.count(Spectrum.id) > 1))
+            return Compound.id.in_(dup)
+        raise ValueError(f"unknown issue {issue!r}; one of {sorted(self.ISSUES)}")
+
     def _compound_filters(self, text: str = "", mass: float | None = None, ppm: float = 10.0,
                           polarity: str | None = None, adduct: str | None = None,
-                          collision_energy: float | None = None) -> list:
-        conditions = []
+                          collision_energy: float | None = None, issue: str | None = None) -> list:
+        conditions = [self._issue_condition(issue)] if issue else []
         text = (text or "").strip()
         if text:
             like = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -630,4 +654,84 @@ class Library:
         finally:
             conn.close()
         return {"compounds_added": new_compounds, "spectra_added": added, "spectra_skipped": n_src - added}
+
+    # ---------- Overview / QC ----------
+
+    def overview(self, mz_bin: float = 50.0) -> dict:
+        """Aggregate statistics for the overview tab, all in SQL."""
+        with self.engine.connect() as conn:
+            q = lambda sql, *a: conn.exec_driver_sql(sql, a).fetchall()
+            n_compounds = q("SELECT COUNT(*) FROM compound")[0][0]
+            n_spectra = q("SELECT COUNT(*) FROM spectrum")[0][0]
+            issues = {}
+            with self.session_scope() as session:
+                for issue in self.ISSUES:
+                    issues[issue] = session.query(func.count(Compound.id)).filter(
+                        self._issue_condition(issue)).scalar()
+            return {
+                "n_compounds": n_compounds,
+                "n_spectra": n_spectra,
+                "polarity": [[p or "unknown", n] for p, n in
+                             q("SELECT polarity, COUNT(*) FROM spectrum GROUP BY polarity ORDER BY 2 DESC")],
+                "adduct": [[a or "unknown", n] for a, n in
+                           q("SELECT a.formula, COUNT(*) FROM spectrum s LEFT JOIN adduct_type a"
+                             " ON a.id = s.adduct_type_id GROUP BY s.adduct_type_id ORDER BY 2 DESC")],
+                "collision_energy": [[ce, n] for ce, n in
+                                     q("SELECT collision_energy, COUNT(*) FROM spectrum"
+                                       " GROUP BY collision_energy ORDER BY 2 DESC")],
+                "precursor_mz": [[b * mz_bin, n] for b, n in
+                                 q("SELECT CAST(precursor_mz / ? AS INTEGER) b, COUNT(*) FROM spectrum"
+                                   " GROUP BY b ORDER BY b", mz_bin)],
+                "peaks": [[label, n] for label, n in q(
+                    "SELECT CASE WHEN k <= 2 THEN '1–2' WHEN k <= 5 THEN '3–5' WHEN k <= 10 THEN '6–10'"
+                    " WHEN k <= 20 THEN '11–20' WHEN k <= 50 THEN '21–50' ELSE '> 50' END l, COUNT(*)"
+                    " FROM (SELECT length(mz_array) / 4 k FROM spectrum) GROUP BY l ORDER BY MIN(k)")],
+                "issues": [{"key": k, "label": label, "count": issues[k]} for k, label in self.ISSUES.items()],
+            }
+
+    # ---------- Spectral search ----------
+
+    def search_spectrum(self, mz, intensity, *, precursor_mz: float, polarity: str | None = None,
+                        precursor_ppm: float = 10.0, analog_window: float = 0.0,
+                        fragment_tolerance: float = 0.01, min_matched: int = 2, top: int = 20,
+                        exclude_spectrum_id: int | None = None) -> list[dict]:
+        """Library spectra most similar to a query (best cosine first).
+
+        Candidates are spectra whose precursor is within ``precursor_ppm`` of
+        ``precursor_mz``; with ``analog_window`` > 0 (Da), within that window
+        instead, scored with the modified cosine (analog search).
+        """
+        from libviz.core.similarity import cosine
+        if analog_window > 0:
+            lo, hi = precursor_mz - analog_window, precursor_mz + analog_window
+        else:
+            tol = precursor_mz * precursor_ppm / 1e6
+            lo, hi = precursor_mz - tol, precursor_mz + tol
+        sql = ("SELECT s.id, s.compound_id, c.name, c.formula, c.inchikey, a.formula, s.polarity,"
+               " s.collision_energy, s.precursor_mz, s.mz_array, s.intensity_array"
+               " FROM spectrum s JOIN compound c ON c.id = s.compound_id"
+               " LEFT JOIN adduct_type a ON a.id = s.adduct_type_id"
+               " WHERE s.precursor_mz BETWEEN ? AND ?")
+        args = [lo, hi]
+        if polarity:
+            sql += " AND s.polarity = ?"
+            args.append(polarity)
+        hits = []
+        with self.engine.connect() as conn:
+            for row in conn.exec_driver_sql(sql, tuple(args)):
+                if row[0] == exclude_spectrum_id:
+                    continue
+                lib_mz = np.frombuffer(row[9], dtype="<f4")
+                lib_int = np.frombuffer(row[10], dtype="<f4")
+                match = cosine(mz, intensity, lib_mz, lib_int, tolerance=fragment_tolerance,
+                               precursor_a=precursor_mz, precursor_b=row[8], modified=analog_window > 0)
+                if match.n_matched < min_matched:
+                    continue
+                hits.append({"spectrum_id": row[0], "compound_id": row[1], "name": row[2] or "",
+                             "formula": row[3] or "", "inchikey": row[4] or "", "adduct": row[5] or "",
+                             "polarity": row[6] or "", "collision_energy": row[7], "precursor_mz": row[8],
+                             "delta_mz": row[8] - precursor_mz, "score": match.score,
+                             "n_matched": match.n_matched})
+        hits.sort(key=lambda h: h["score"], reverse=True)
+        return hits[:top]
 

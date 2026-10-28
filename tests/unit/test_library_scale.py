@@ -53,9 +53,15 @@ def test_browse_queries_stay_interactive(tmp_path):
         "count polarity": timed(lib.count_compounds, polarity="NEGATIVE"),
         "filter options": timed(lib.filter_options),
         "spectra of compound": timed(lib.get_compound_spectra, compound_id=777),
+        "overview": timed(lib.overview),
+        "issue few_peaks": timed(lib.count_compounds, issue="few_peaks"),
+        "issue duplicates": timed(lib.count_compounds, issue="duplicates"),
+        "spectral search": timed(lib.search_spectrum, mz=np.arange(20.0), intensity=np.ones(20),
+                                 precursor_mz=501.0, precursor_ppm=20),
     }
     print(timings)
-    slow = {k: round(v, 3) for k, v in timings.items() if v > 1.0}
+    # overview runs every QC aggregate over all spectra: allowed a few seconds
+    slow = {k: round(v, 3) for k, v in timings.items() if v > (5.0 if k == "overview" else 1.0)}
     assert not slow, slow
 
 

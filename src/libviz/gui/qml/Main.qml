@@ -53,14 +53,15 @@ ApplicationWindow {
     Component.onCompleted: Theme.isDark = settings.isDark
 
     readonly property bool hasSelection: Libraries.selectedKey !== ""
-    property bool showBuilder: false
+    // "" = the selected library (or welcome), "builder", "search"
+    property string page: ""
     // "New library…" from the builder's commit dialog: commit once it's created.
     property bool commitAfterCreate: false
     // Pages call these to drive the shared dialogs.
     function openLibraryDialog() { openDbDialog.open() }
     function importMspDialog() { mspDialog.open() }
     function newLibraryDialog() { newDbDialog.open() }
-    function openBuilder() { showBuilder = true }
+    function openBuilder() { page = "builder" }
 
     function addRecent(path) {
         var list = settings.recentLibraries.filter(function (p) { return p !== path })
@@ -117,6 +118,7 @@ ApplicationWindow {
         Menu {
             title: qsTr("&Library")
             Action { text: qsTr("&Build from mzML…"); shortcut: "Ctrl+B"; onTriggered: window.openBuilder() }
+            Action { text: qsTr("&Spectral search…"); shortcut: "Ctrl+F"; onTriggered: window.page = "search" }
             MenuSeparator {}
             Action { text: qsTr("&Rename…"); enabled: window.hasSelection && !Libraries.busy; onTriggered: renameDialog.openWith(Libraries.selected.name) }
             Action { text: qsTr("&Merge another library into this…"); enabled: window.hasSelection && !Libraries.busy; onTriggered: mergeDialog.open() }
@@ -147,7 +149,16 @@ ApplicationWindow {
         Loader {
             id: contentLoader
             SplitView.fillWidth: true
-            sourceComponent: window.showBuilder ? builderPage : window.hasSelection ? libraryPage : welcomePage
+            sourceComponent: window.page === "builder" ? builderPage : window.page === "search" ? searchPage
+                           : window.hasSelection ? libraryPage : welcomePage
+        }
+    }
+
+    Component {
+        id: searchPage
+        SearchPage {
+            onCloseRequested: window.page = ""
+            onOpenHit: (path, compoundId) => { window.page = ""; Libraries.selectLibrary(path); Inspector.selectCompound(compoundId) }
         }
     }
 
@@ -155,7 +166,7 @@ ApplicationWindow {
     Component {
         id: builderPage
         BuilderPage {
-            onCloseRequested: window.showBuilder = false
+            onCloseRequested: window.page = ""
             onNewLibraryRequested: { window.commitAfterCreate = true; newDbDialog.open() }
         }
     }
@@ -199,10 +210,14 @@ ApplicationWindow {
         function onErrorOccurred(message) { window.showError(message) }
     }
     Connections {
+        target: Search
+        function onErrorOccurred(message) { window.showError(message) }
+    }
+    Connections {
         target: Builder
         function onErrorOccurred(message) { window.showError(message) }
         function onCommitted(key, message) {
-            window.showBuilder = false
+            window.page = ""
             Libraries.selectLibrary(key)
             infoDialog.text = message
             infoDialog.open()
@@ -211,7 +226,7 @@ ApplicationWindow {
     Connections {
         target: Libraries
         function onLibraryOpened(key) {
-            if (window.commitAfterCreate && window.showBuilder && contentLoader.item)
+            if (window.commitAfterCreate && window.page === "builder" && contentLoader.item)
                 contentLoader.item.commitTo(key)
             window.commitAfterCreate = false
         }

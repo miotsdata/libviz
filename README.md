@@ -6,6 +6,7 @@ Build, inspect and curate MS/MS spectral libraries.
 - **Import** MSP libraries (MoNA, MS-DIAL, NIST-style exports).
 - **Inspect** libraries: search compounds, view spectra and metadata, even with 500k+ spectra.
 - **Curate**: edit/delete compounds, spectra and metadata; export MSP; merge libraries.
+- **QC & search**: library overview with quality checks, spectrum comparison (cosine), spectral/analog search.
 
 ## Install
 

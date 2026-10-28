@@ -300,10 +300,8 @@ def find_candidates(targets: Sequence[Target], mzml_files: Sequence[Path | str],
 
     totals = [count_spectra(Path(f)) for f in mzml_files] if progress else [0] * len(mzml_files)
     for file_number, path in enumerate(mzml_files):
-        file_progress = None
-        if progress:
-            def file_progress(done, _total, base=sum(totals[:file_number])):
-                progress(base + done, sum(totals))
+        base = sum(totals[:file_number])
+        file_progress = (lambda done, _total, base=base: progress(base + done, sum(totals))) if progress else None
         for scan in iter_ms2(Path(path), keep, file_progress):
             for k, ppm in scan_matches:
                 target_mz, target_index, adduct, polarity = ions[k]
