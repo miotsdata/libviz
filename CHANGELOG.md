@@ -2,12 +2,18 @@
 
 ## Unreleased
 
+### Fixed
+- Spectral search: loading a new query (*Search similar*, *Load mzML scan…*) left the previous hits on screen as if they belonged to it.
+
 ### Added
 - mzML builder: an EIC of the selected row's precursor (MS1) above the spectrum, with the MS2 scans marked at their RT, to see the real peak and pick the scan on it.
 - mzML files are parsed once into a SQLite database next to them (`run.mzML.db`, MSIAnalyzer's raw schema) and reused: later searches don't re-read the XML (ADR 8).
 - mzML builder: explore without a target list by typing an m/z or formula and an adduct. Each hand-entered target is identified when added to a library, as an existing compound of that library or a new one.
 
+- Retention time per spectrum (minutes): read from MSP (`RETENTIONTIME`, `RT`, `RTINSECONDS`, …) and written back as `RETENTIONTIME`. In the builder it comes from the chosen scan, or is set by hand or by clicking the EIC. It is editable in the inspector and shown with Δ RT in spectral search (display only).
+
 ### Changed
+- Opening a library brings it to the current schema (migrations used to run only on create). RT found in old metadata is copied into the new field.
 - Each open library keeps its own filters and selected compound/spectrum when switching between libraries.
 
 ## 0.2.1 — 2026-10-28

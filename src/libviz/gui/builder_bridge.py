@@ -23,6 +23,7 @@ _PARAMS = {
     "minPeaks": ("min_peaks", int, int),
     "normalize": ("normalize", bool, bool),
     "rankBy": ("rank_by", str, str),
+    "storeRt": ("store_rt", bool, bool),
 }
 
 
@@ -254,7 +255,7 @@ class BuilderBridge(QObject):
             "mz": g.target_mz, "ce": "" if g.collision_energy is None else f"{g.collision_energy:g}",
             "n": len(g.candidates), "chosen": -1 if g.chosen is None else g.chosen, "status": group_status(g),
             "ppm": "" if c is None or c.ppm_error is None else f"{c.ppm_error:+.1f}",
-            "rt": "" if c is None or c.rt_min is None else f"{c.rt_min:.2f}",
+            "rt": "" if g.effective_rt is None else f"{g.effective_rt:.2f}" + (" ✎" if g.rt_set else ""),
             "file": "" if c is None else c.file,
         }
 
@@ -382,6 +383,34 @@ class BuilderBridge(QObject):
             self._rows.set_row(i, self._row(i, groups[i]))
         self.resultChanged.emit()
         self.selectionChanged.emit()
+
+    @Property("QVariantMap", notify=selectionChanged)
+    def rowRt(self) -> dict:
+        """RT stored with the selected row's spectrum (minutes; "" = none)."""
+        group = self._group()
+        rt = group.effective_rt if group is not None else None
+        return {"text": "" if rt is None else f"{rt:.3f}", "edited": bool(group and group.rt_set)}
+
+    @Slot(int, str)
+    def setRt(self, group_index: int, text: str):
+        """Set the row's RT by hand; empty text = store no RT."""
+        group = self._result.groups[group_index]
+        text = text.strip().replace(",", ".")
+        try:
+            group.rt = float(text) if text else None
+        except ValueError:
+            self.errorOccurred.emit(f"RT must be a number of minutes, not {text!r}")
+            self.selectionChanged.emit()
+            return
+        group.rt_set = True
+        self._changed([group_index])
+
+    @Slot(int)
+    def resetRt(self, group_index: int):
+        """Back to the chosen scan's RT."""
+        group = self._result.groups[group_index]
+        group.rt_set, group.rt = False, None
+        self._changed([group_index])
 
     @Slot(int, int)
     def choose(self, group_index: int, candidate_index: int):

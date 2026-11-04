@@ -67,15 +67,21 @@ similarity and the number of matched peaks.
 
 - **Query:** paste peaks (`m/z intensity` per line), *Search similar* from
   the inspector, or *Load mzML scan…* (file + scan number). The precursor
-  m/z is required.
+  m/z is required. *RT* is optional. It is filled in from the scan or the
+  library spectrum.
 - Every open library is searched:
   - Spectra with a precursor within the ppm tolerance are scored by cosine
     similarity.
   - *Analog search* instead uses every precursor within ± the window (Da)
     and scores with the modified cosine, which also matches fragments
     shifted by the precursor difference.
+- Hits show the library spectrum's **RT**, and **Δ RT** (hit − query) when
+  both sides have one. RT is only shown, never used to filter: RTs differ
+  between methods and columns.
 - Click a hit to see the query vs library mirror plot. Double-click it to
   open the compound in its library.
+- Loading a new query (*Search similar*, *Load mzML scan…*) clears the
+  previous hits.
 
 ## Curating
 
@@ -151,6 +157,22 @@ Changes are written to the library immediately and can't be undone. Use
      polarity and CE, choose whether to keep it or replace it.
    - Provenance (file, scan, RT, observed m/z and ppm error) is saved in the
      spectrum's metadata.
+   - **Retention time:** each spectrum stores the chosen scan's RT, unless
+     you set one under the EIC. Type a value, or click a point of the EIC
+     trace, for example at the apex. Leave the field empty to store no RT,
+     and ↺ goes back to the scan's RT. Turn *Store retention time* off in
+     the parameters for imaging runs.
+
+## Retention time
+
+- Every spectrum can have an RT in **minutes**. It appears in the spectra
+  list and is editable in the spectrum panel (empty = unknown).
+- **MSP import** reads `RETENTIONTIME`, `RETENTION_TIME`, `RT` and
+  `RTINMINUTES` as minutes and `RTINSECONDS` as seconds. A value that isn't
+  a number stays as metadata. **Export** writes `RETENTIONTIME` in minutes.
+- Libraries made before this version are updated when opened. An RT found
+  in their metadata (`rt_min`, `RETENTIONTIME`, …) is copied into the RT
+  field, and the metadata entry is kept.
 
 ## Command line
 

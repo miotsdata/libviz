@@ -330,6 +330,17 @@ class InspectorBridge(QObject):
             self._write(self._lib.set_spectrum_metadata, self._spectrum["id"], key, value)
 
     @Slot(str)
+    def setSpectrumRt(self, text: str):
+        """RT in minutes; empty = unknown."""
+        if not self._spectrum or self._lib is None:
+            return
+        rt = parse_float(text)
+        if text.strip() and rt is None:
+            self.errorOccurred.emit(f"RT must be a number of minutes, not {text!r}")
+            return
+        self._write(self._lib.set_spectrum_rt, self._spectrum["id"], rt)
+
+    @Slot(str)
     def deleteMetadata(self, key: str):
         if self._spectrum and self._lib is not None:
             self._write(self._lib.delete_spectrum_metadata, self._spectrum["id"], key)

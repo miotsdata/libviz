@@ -4,6 +4,8 @@ from pathlib import Path
 
 import numpy as np
 
+from libviz.core.readers.msp_reader import RT_KEYS
+
 BATCH = 2000
 # Written from the spectrum/compound columns; same-named metadata is skipped.
 _RESERVED = {"NAME", "PRECURSORMZ", "PRECURSORTYPE", "FORMULA", "INCHIKEY", "SMILES", "PUBCHEM",
@@ -15,7 +17,7 @@ def _clean(value) -> str:
 
 
 def _entry(row, metadata: list[tuple[str, str]]) -> str:
-    (name, formula, inchikey, smiles, pubchem, exact_mass, precursor_mz, adduct, polarity, ce,
+    (name, formula, inchikey, smiles, pubchem, exact_mass, precursor_mz, adduct, polarity, ce, rt,
      mz_blob, int_blob) = row
     mz = np.frombuffer(mz_blob, dtype="<f4")
     intensity = np.frombuffer(int_blob, dtype="<f4")
@@ -35,9 +37,12 @@ def _entry(row, metadata: list[tuple[str, str]]) -> str:
     if polarity:
         lines.append(f"IONMODE: {polarity.capitalize()}")
     lines.append(f"COLLISIONENERGY: {ce:g}")
+    if rt is not None:
+        lines.append(f"RETENTIONTIME: {rt:.4f}")  # minutes
+    reserved = _RESERVED | set(RT_KEYS) if rt is not None else _RESERVED
     for key, value in metadata:
         key = _clean(key).replace(":", "_")
-        if key.upper() not in _RESERVED and key:
+        if key.upper() not in reserved and key:
             lines.append(f"{key}: {_clean(value)}")
     lines.append(f"Num Peaks: {len(mz)}")
     lines.extend(f"{m:.5f}\t{i:g}" for m, i in zip(mz.tolist(), intensity.tolist()))
@@ -61,7 +66,7 @@ def write_msp(library, path: Path | str, *, compound_ids: list[int] | None = Non
         while True:
             rows = conn.exec_driver_sql(
                 "SELECT s.id, c.name, c.formula, c.inchikey, c.smiles, c.pubchem_id, c.exact_mass,"
-                " s.precursor_mz, a.formula, s.polarity, s.collision_energy, s.mz_array, s.intensity_array"
+                " s.precursor_mz, a.formula, s.polarity, s.collision_energy, s.rt, s.mz_array, s.intensity_array"
                 " FROM spectrum s JOIN compound c ON c.id = s.compound_id"
                 " LEFT JOIN adduct_type a ON a.id = s.adduct_type_id"
                 f" {where + ' AND' if where else 'WHERE'} s.id > ? ORDER BY s.id LIMIT {BATCH}",

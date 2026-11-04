@@ -22,6 +22,25 @@ KNOWN_KEYS = {
     "SMILES",
 }
 
+# Retention-time keys -> factor to minutes. A bare RETENTIONTIME/RT is taken
+# as minutes (MS-DIAL, NIST); the first parsable one goes to spectrum.rt.
+RT_KEYS = {"RETENTIONTIME": 1.0, "RETENTION_TIME": 1.0, "RT": 1.0, "RTINMINUTES": 1.0,
+           "RTINSECONDS": 1 / 60}
+
+
+def parse_rt(entry: dict) -> tuple[float | None, set[str]]:
+    """(RT in minutes or None, the RT keys holding a number: not kept as metadata)."""
+    rt, used = None, set()
+    for key, factor in RT_KEYS.items():
+        try:
+            value = float(str(entry[key]).strip().replace(",", ".")) * factor
+        except (KeyError, ValueError):
+            continue
+        used.add(key)
+        rt = value if rt is None else rt
+    return rt, used
+
+
 # Some exporters (e.g. MoNA) don't expose SMILES/PubChem CID as top-level
 # MSP keys; they bury them as quoted "key=value" segments inside COMMENT(S).
 _COMMENT_FIELD_RE = re.compile(r'"([^"]*)"')
@@ -142,7 +161,8 @@ class MSPReader:
             self.skipped["duplicate spectrum"] += 1
             return
         self._seen.add(identity)
-        extra = {k: v for k, v in entry.items() if k not in KNOWN_KEYS}
+        rt, rt_keys = parse_rt(entry)
+        extra = {k: v for k, v in entry.items() if k not in KNOWN_KEYS and k not in rt_keys}
 
         spectrum_rows.append({
             "_inchikey":     inchikey,
@@ -153,6 +173,7 @@ class MSPReader:
             "_hash":         spectrum_hash,
             "_polarity":     polarity,
             "_ce":           ce,
+            "_rt":           rt,
             "_metadata":     extra,
         })
 
@@ -192,8 +213,8 @@ class MSPReader:
             conn.exec_driver_sql(
                 "INSERT OR IGNORE INTO spectrum "
                 "(compound_id, precursor_mz, adduct_type_id, polarity, "
-                " collision_energy, spectrum_hash, mz_array, intensity_array, added_on) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " collision_energy, rt, spectrum_hash, mz_array, intensity_array, added_on) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [self._build_spectrum_tuple(r, now) for r in no_meta]
             )
 
@@ -203,8 +224,8 @@ class MSPReader:
             cursor = conn.exec_driver_sql(
                 "INSERT OR IGNORE INTO spectrum "
                 "(compound_id, precursor_mz, adduct_type_id, polarity, "
-                " collision_energy, spectrum_hash, mz_array, intensity_array, added_on) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " collision_energy, rt, spectrum_hash, mz_array, intensity_array, added_on) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 self._build_spectrum_tuple(row, now)
             )
             if cursor.rowcount == 0:
@@ -230,6 +251,7 @@ class MSPReader:
             row["_adduct_id"],
             row["_polarity"],
             row["_ce"],
+            row["_rt"],
             row["_hash"],
             row["_mz"].tobytes(),
             row["_intensity"].tobytes(),

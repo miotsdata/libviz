@@ -210,6 +210,7 @@ class BuildParams:
     min_peaks: int = 1
     normalize: bool = True  # base peak = 1000
     rank_by: str = "precursor_intensity"
+    store_rt: bool = True  # False for runs where RT means nothing (imaging)
 
     def __post_init__(self):
         if self.rank_by not in RANK_BY:
@@ -254,10 +255,19 @@ class Group:
     collision_energy: float | None  # None: no MS2 found for this target/adduct
     candidates: list[Candidate] = field(default_factory=list)
     chosen: int | None = None  # index into candidates; None = not added
+    rt_set: bool = False  # True: ``rt`` was set by hand (None = store no RT)
+    rt: float | None = None
 
     @property
     def key(self) -> tuple:
         return (self.target_index, self.adduct, self.collision_energy)
+
+    @property
+    def effective_rt(self) -> float | None:
+        """RT stored with the spectrum: set by hand, else the chosen scan's."""
+        if self.rt_set:
+            return self.rt
+        return self.candidates[self.chosen].rt_min if self.chosen is not None else None
 
 
 @dataclass
@@ -491,6 +501,7 @@ def commit(library, result: BuildResult, on_conflict: str = "skip") -> dict[str,
                 compound_id=compound.id, precursor_mz=round(group.target_mz, 5), adduct_type_id=adduct_id,
                 polarity=group.polarity, collision_energy=group.collision_energy,
                 mz=candidate.mz, intensity=candidate.intensity,
+                rt=group.effective_rt if result.params.store_rt else None,
             )
             session.add(spectrum)
             session.flush()

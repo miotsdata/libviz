@@ -33,7 +33,7 @@ class SearchBridge(QObject):
     def __init__(self, libraries: LibraryBridge, parent=None):
         super().__init__(parent)
         self._libraries = libraries
-        self._query = {"peaks": "", "precursor": "", "polarity": "", "title": ""}
+        self._query = {"peaks": "", "precursor": "", "polarity": "", "title": "", "rt": ""}
         self._running = False
         self._results: list[dict] = []
         self._selected = -1
@@ -46,10 +46,18 @@ class SearchBridge(QObject):
     def query(self) -> dict:
         return self._query
 
-    def _set_query(self, peaks: str, precursor, polarity: str, title: str):
+    def _set_query(self, peaks: str, precursor, polarity: str, title: str, rt: float | None = None):
         self._query = {"peaks": peaks, "precursor": "" if precursor is None else f"{precursor:.5f}",
-                       "polarity": polarity or "", "title": title}
+                       "polarity": polarity or "", "title": title, "rt": "" if rt is None else f"{rt:.3f}"}
         self.queryChanged.emit()
+        # A new query starts clean: old hits would look like its results, and
+        # a search still running for the old query is dropped.
+        self._request += 1
+        self._running = False
+        self._results, self._selected, self._hit = [], -1, {}
+        self.runningChanged.emit()
+        self.resultsChanged.emit()
+        self.selectionChanged.emit()
 
     @Slot(str, str, str)
     def setQuery(self, peaks: str, precursor: str, polarity: str):
@@ -61,7 +69,8 @@ class SearchBridge(QObject):
         if not spectrum:
             return
         self._set_query(peaks_text(spectrum["mz"], spectrum["intensity"]), spectrum["precursor_mz"],
-                        spectrum.get("polarity", ""), f"{name} {spectrum.get('adduct', '')} CE {spectrum.get('collision_energy')}")
+                        spectrum.get("polarity", ""), f"{name} {spectrum.get('adduct', '')} CE {spectrum.get('collision_energy')}",
+                        spectrum.get("rt"))
         self._exclude = spectrum.get("id")
 
     @Slot(str, str)
@@ -70,7 +79,7 @@ class SearchBridge(QObject):
 
         def loaded(s):
             self._set_query(peaks_text(s.mz, s.intensity), s.precursor_mz, s.polarity or "",
-                            f"{s.file} {s.scan_id.split()[-1] if s.scan_id else ''}")
+                            f"{s.file} {s.scan_id.split()[-1] if s.scan_id else ''}", s.rt_min)
             self._exclude = None
         start_task(self, read_scan, path, scan, on_success=loaded, on_error=self.errorOccurred)
 
@@ -80,9 +89,10 @@ class SearchBridge(QObject):
     def running(self) -> bool:
         return self._running
 
-    @Slot(str, str, str, str, str, str, str)
+    @Slot(str, str, str, str, str, str, str, str)
     def search(self, peaks: str, precursor: str, polarity: str, ppm: str, analog_window: str,
-               tolerance: str, min_matched: str):
+               tolerance: str, min_matched: str, rt: str = ""):
+        """``rt`` (minutes, optional) is only displayed: each hit gets its Δ RT."""
         mz, intensity = parse_peak_list(peaks)
         precursor_mz = parse_float(precursor)
         if not len(mz):
@@ -95,7 +105,8 @@ class SearchBridge(QObject):
         if not libraries:
             self.errorOccurred.emit("Open at least one library to search.")
             return
-        self._query = {**self._query, "peaks": peaks, "precursor": precursor, "polarity": polarity}
+        self._query = {**self._query, "peaks": peaks, "precursor": precursor, "polarity": polarity, "rt": rt}
+        query_rt = parse_float(rt)
         options = dict(precursor_mz=precursor_mz, polarity=polarity or None,
                        precursor_ppm=parse_float(ppm) or 10.0, analog_window=parse_float(analog_window) or 0.0,
                        fragment_tolerance=parse_float(tolerance) or 0.01,
@@ -108,7 +119,8 @@ class SearchBridge(QObject):
             hits = []
             for lib in libraries:
                 for h in lib.search_spectrum(mz, intensity, exclude_spectrum_id=exclude, **options):
-                    hits.append({**h, "library": lib.name, "libraryPath": str(lib.path)})
+                    delta_rt = h["rt"] - query_rt if h["rt"] is not None and query_rt is not None else None
+                    hits.append({**h, "library": lib.name, "libraryPath": str(lib.path), "delta_rt": delta_rt})
             hits.sort(key=lambda h: h["score"], reverse=True)
             return hits[:50]
 

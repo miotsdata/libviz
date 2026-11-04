@@ -16,6 +16,7 @@ class Spectrum(Base):
     adduct_type_id = Column(Integer, ForeignKey("adduct_type.id"), nullable=False, index=True)
     polarity = Column(String, CheckConstraint("polarity IN ('POSITIVE', 'NEGATIVE')"), nullable=True, index=True)
     collision_energy = Column(Float, index=True, nullable=False)
+    rt = Column(Float, index=True, nullable=True)  # retention time, minutes; NULL = unknown
     mz_array = Column(LargeBinary, nullable=False)
     intensity_array = Column(LargeBinary, nullable=False)
     added_on = Column(
@@ -55,6 +56,7 @@ class Spectrum(Base):
         collision_energy: float,
         mz: np.ndarray,
         intensity: np.ndarray,
+        rt: float | None = None,
     ):
         
         mz = np.asarray(mz, dtype="<f4")
@@ -70,6 +72,7 @@ class Spectrum(Base):
             adduct_type_id=adduct_type_id,
             polarity=polarity,
             collision_energy=collision_energy,
+            rt=rt,
             mz_array=mz.tobytes(),
             intensity_array=intensity.tobytes(),
             spectrum_hash=calculate_spectrum_hash(mz, intensity),

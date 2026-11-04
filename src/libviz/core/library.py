@@ -186,6 +186,17 @@ class Library:
         if not Path(path).exists():
             raise FileNotFoundError(path)
 
+        # Bring an older library to the current schema (no-op when current);
+        # the ORM models assume it. Only Alembic-managed files: never create
+        # tables in some other SQLite file.
+        import sqlite3
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            managed = con.execute("SELECT 1 FROM sqlite_master WHERE name = 'alembic_version'").fetchone()
+        finally:
+            con.close()
+        if managed:
+            upgrade_library_schema(path)
         lib = cls(name="unnamed", path=path)
         with lib.session_scope() as session:
             meta = session.query(LibraryMetadata).first()
@@ -294,7 +305,8 @@ class Library:
                 polarity=spectra_info["polarity"],
                 collision_energy=spectra_info["collision_energy"],
                 mz=spectra_info["mz"],
-                intensity=spectra_info["intensity"]
+                intensity=spectra_info["intensity"],
+                rt=spectra_info.get("rt"),
             )
 
             session.add(spectrum)
@@ -510,7 +522,8 @@ class Library:
         with self.session_scope() as session:
             rows = (
                 session.query(Spectrum.id, Spectrum.precursor_mz, AdductType.formula, Spectrum.polarity,
-                              Spectrum.collision_energy, func.length(Spectrum.mz_array) / 4, Spectrum.added_on)
+                              Spectrum.collision_energy, func.length(Spectrum.mz_array) / 4, Spectrum.added_on,
+                              Spectrum.rt)
                 .join(AdductType, AdductType.id == Spectrum.adduct_type_id)
                 .filter(Spectrum.compound_id == compound_id)
                 .order_by(Spectrum.polarity, AdductType.formula, Spectrum.collision_energy, Spectrum.id)
@@ -518,7 +531,7 @@ class Library:
             )
         return [{"id": r[0], "precursor_mz": r[1], "adduct": r[2] or "", "polarity": r[3] or "",
                  "collision_energy": r[4], "n_peaks": int(r[5] or 0),
-                 "added_on": r[6].isoformat(timespec="seconds") if r[6] else ""} for r in rows]
+                 "added_on": r[6].isoformat(timespec="seconds") if r[6] else "", "rt": r[7]} for r in rows]
 
     def get_spectrum(self, spectrum_id: int) -> dict:
         """One spectrum with peaks (plain lists) and its key/value metadata."""
@@ -533,6 +546,7 @@ class Library:
                 "adduct": s.adduct_type.formula if s.adduct_type else "",
                 "polarity": s.polarity or "",
                 "collision_energy": s.collision_energy,
+                "rt": s.rt,
                 "mz": s.mz_numpy().astype(float).tolist(),
                 "intensity": s.intensity_numpy().astype(float).tolist(),
                 "metadata": {m.key: m.value for m in s.spectrum_metadata},
@@ -594,6 +608,16 @@ class Library:
             else:
                 session.add(SpectrumMetadata(spectrum_id=spectrum_id, key=key, value=str(value)))
 
+    def set_spectrum_rt(self, spectrum_id: int, rt: float | None):
+        """Set the retention time (minutes) of a spectrum; None clears it."""
+        if rt is not None and rt < 0:
+            raise ValueError("RT cannot be negative")
+        with self.session_scope() as session:
+            s = session.get(Spectrum, spectrum_id)
+            if s is None:
+                raise ValueError(f"Spectrum with ID {spectrum_id} not found")
+            s.rt = rt
+
     def delete_spectrum_metadata(self, spectrum_id: int, key: str):
         with self.session_scope() as session:
             session.query(SpectrumMetadata).filter_by(spectrum_id=spectrum_id, key=key).delete()
@@ -623,6 +647,7 @@ class Library:
                 n_compounds = cur.execute("SELECT COUNT(*) FROM compound").fetchone()[0]
                 n_src = cur.execute("SELECT COUNT(*) FROM src.spectrum").fetchone()[0]
                 max_id = cur.execute("SELECT COALESCE(MAX(id), 0) FROM spectrum").fetchone()[0]
+                src_rt = "s.rt" if any(r[1] == "rt" for r in cur.execute("PRAGMA src.table_info(spectrum)")) else "NULL"
                 cur.execute(
                     "INSERT OR IGNORE INTO compound (name, formula, exact_mass, inchikey, smiles, pubchem_id, added_on)"
                     " SELECT name, formula, exact_mass, inchikey, smiles, pubchem_id, added_on FROM src.compound")
@@ -632,8 +657,8 @@ class Library:
                     " WHERE NOT EXISTS (SELECT 1 FROM adduct_type a WHERE a.formula IS sa.formula)")
                 cur.execute(
                     "INSERT OR IGNORE INTO spectrum (compound_id, precursor_mz, adduct_type_id, polarity,"
-                    " collision_energy, mz_array, intensity_array, added_on, spectrum_hash)"
-                    " SELECT c.id, s.precursor_mz, a.id, s.polarity, s.collision_energy, s.mz_array,"
+                    " collision_energy, rt, mz_array, intensity_array, added_on, spectrum_hash)"
+                    f" SELECT c.id, s.precursor_mz, a.id, s.polarity, s.collision_energy, {src_rt}, s.mz_array,"
                     " s.intensity_array, s.added_on, s.spectrum_hash"
                     " FROM src.spectrum s"
                     " JOIN src.compound sc ON sc.id = s.compound_id JOIN compound c ON c.inchikey = sc.inchikey"
@@ -719,7 +744,7 @@ class Library:
             tol = precursor_mz * precursor_ppm / 1e6
             lo, hi = precursor_mz - tol, precursor_mz + tol
         sql = ("SELECT s.id, s.compound_id, c.name, c.formula, c.inchikey, a.formula, s.polarity,"
-               " s.collision_energy, s.precursor_mz, s.mz_array, s.intensity_array"
+               " s.collision_energy, s.precursor_mz, s.mz_array, s.intensity_array, s.rt"
                " FROM spectrum s JOIN compound c ON c.id = s.compound_id"
                " LEFT JOIN adduct_type a ON a.id = s.adduct_type_id"
                " WHERE s.precursor_mz BETWEEN ? AND ?")
@@ -742,7 +767,7 @@ class Library:
                              "formula": row[3] or "", "inchikey": row[4] or "", "adduct": row[5] or "",
                              "polarity": row[6] or "", "collision_energy": row[7], "precursor_mz": row[8],
                              "delta_mz": row[8] - precursor_mz, "score": match.score,
-                             "n_matched": match.n_matched})
+                             "n_matched": match.n_matched, "rt": row[11]})
         hits.sort(key=lambda h: h["score"], reverse=True)
         return hits[:top]
 

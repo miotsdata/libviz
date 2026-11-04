@@ -81,7 +81,7 @@ SplitView {
                     x: 8
                     anchors.verticalCenter: parent.verticalCenter
                     Repeater {
-                        model: [[qsTr("Adduct"), 110], [qsTr("Polarity"), 90], [qsTr("CE"), 60], [qsTr("Precursor m/z"), 120], [qsTr("Peaks"), 60], [qsTr("Added"), 160]]
+                        model: [[qsTr("Adduct"), 110], [qsTr("Polarity"), 90], [qsTr("CE"), 60], [qsTr("Precursor m/z"), 120], [qsTr("RT"), 60], [qsTr("Peaks"), 60], [qsTr("Added"), 160]]
                         Label { width: modelData[1]; text: modelData[0]; font.bold: true; font.pixelSize: Theme.captionPixelSize }
                     }
                 }
@@ -110,6 +110,7 @@ SplitView {
                     Repeater {
                         model: [[srow.modelData.adduct, 110], [srow.modelData.polarity, 90],
                                 [srow.modelData.collision_energy, 60], [root.fmt(srow.modelData.precursor_mz, 4), 120],
+                                [root.fmt(srow.modelData.rt, 2), 60],
                                 [srow.modelData.n_peaks, 60], [srow.modelData.added_on.replace("T", " ").slice(0, 16), 160]]
                         Label {
                             width: modelData[1]
@@ -234,6 +235,20 @@ SplitView {
                     onLinkActivated: link => Qt.openUrlExternally(link)
                     HoverHandler { cursorShape: Qt.PointingHandCursor }
                 }
+            }
+            RowLayout {
+                visible: root.spectrum.id !== undefined
+                Key { text: qsTr("Retention time (min)") }
+                TextField {
+                    objectName: "spectrumRtField"
+                    Layout.preferredWidth: 100
+                    text: root.spectrum.rt === null || root.spectrum.rt === undefined ? "" : root.fmt(root.spectrum.rt, 3)
+                    placeholderText: qsTr("unknown")
+                    validator: RegularExpressionValidator { regularExpression: /^\d*[.,]?\d*$/ }
+                    onEditingFinished: if (text !== (root.spectrum.rt === null || root.spectrum.rt === undefined ? "" : root.fmt(root.spectrum.rt, 3)))
+                                           Inspector.setSpectrumRt(text)
+                }
+                Item { Layout.fillWidth: true }
             }
             RowLayout {
                 visible: root.spectrum.id !== undefined

@@ -13,13 +13,14 @@ Item {
 
     function run() {
         Search.search(peaksArea.text, precursorField.text, polarityBox.currentIndex > 0 ? polarityBox.currentText : "",
-                      ppmField.text, analogBox.checked ? windowField.text : "0", tolField.text, minField.text)
+                      ppmField.text, analogBox.checked ? windowField.text : "0", tolField.text, minField.text, rtField.text)
     }
     Connections {
         target: Search
         function onQueryChanged() {
             peaksArea.text = page.q.peaks
             precursorField.text = page.q.precursor
+            rtField.text = page.q.rt || ""
             polarityBox.currentIndex = Math.max(0, polarityBox.model.indexOf(page.q.polarity))
         }
     }
@@ -85,6 +86,15 @@ Item {
                     columnSpacing: 8
                     Label { text: qsTr("Precursor m/z") }
                     TextField { id: precursorField; Layout.fillWidth: true }
+                    Label { text: qsTr("RT (min, optional)") }
+                    TextField {
+                        id: rtField
+                        Layout.fillWidth: true
+                        validator: RegularExpressionValidator { regularExpression: /^\d*[.,]?\d*$/ }
+                        ToolTip.visible: hovered
+                        ToolTip.delay: 600
+                        ToolTip.text: qsTr("Only shown as Δ RT next to hits that have an RT; it does not filter")
+                    }
                     Label { text: qsTr("Polarity") }
                     ComboBox { id: polarityBox; Layout.fillWidth: true; model: [qsTr("Any"), "POSITIVE", "NEGATIVE"] }
                     Label { text: qsTr("Precursor tolerance (ppm)") }
@@ -126,7 +136,8 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             Repeater {
                                 model: [[qsTr("Score"), 60], [qsTr("Matched"), 65], [qsTr("Compound"), 220], [qsTr("Adduct"), 90],
-                                        [qsTr("CE"), 45], [qsTr("Precursor"), 90], [qsTr("Δ m/z"), 70], [qsTr("Library"), 140]]
+                                        [qsTr("CE"), 45], [qsTr("Precursor"), 90], [qsTr("Δ m/z"), 70], [qsTr("RT"), 55],
+                                        [qsTr("Δ RT"), 60], [qsTr("Library"), 140]]
                                 Label { width: modelData[1]; text: modelData[0]; font.bold: true; font.pixelSize: Theme.captionPixelSize }
                             }
                         }
@@ -146,7 +157,10 @@ Item {
                             Repeater {
                                 model: [[hrow.modelData.score.toFixed(3), 60], [hrow.modelData.n_matched, 65], [hrow.modelData.name, 220],
                                         [hrow.modelData.adduct, 90], [hrow.modelData.collision_energy, 45], [hrow.modelData.precursor_mz.toFixed(4), 90],
-                                        [(hrow.modelData.delta_mz >= 0 ? "+" : "") + hrow.modelData.delta_mz.toFixed(4), 70], [hrow.modelData.library, 140]]
+                                        [(hrow.modelData.delta_mz >= 0 ? "+" : "") + hrow.modelData.delta_mz.toFixed(4), 70],
+                                        [hrow.modelData.rt === null ? "" : hrow.modelData.rt.toFixed(2), 55],
+                                        [hrow.modelData.delta_rt === null ? "" : (hrow.modelData.delta_rt >= 0 ? "+" : "") + hrow.modelData.delta_rt.toFixed(2), 60],
+                                        [hrow.modelData.library, 140]]
                                 Label { width: modelData[1]; text: modelData[0]; elide: Text.ElideRight; color: hrow.highlighted ? Theme.highlightedTextColor : Theme.textColor }
                             }
                         }

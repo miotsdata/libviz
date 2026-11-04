@@ -77,6 +77,47 @@ def test_search_validation_and_similar_excludes_self(qtbot, bridges):
     assert [h["name"] for h in search.results][:1] == ["cmp1"]  # itself excluded
 
 
+def test_new_query_clears_old_results_and_drops_running_search(qtbot, bridges):
+    _, inspector, search = bridges
+    with qtbot.waitSignal(search.selectionChanged, timeout=5000):
+        search.search("50 100\n60 100\n70 100", "100.0", "", "10", "0", "0.01", "2")
+    qtbot.waitUntil(lambda: bool(search.mirror.get("hit")))
+
+    with qtbot.waitSignal(inspector.spectrumChanged, timeout=5000):
+        inspector.selectCompoundRow(2)
+    search.useSpectrum(inspector.spectrum, inspector.compound["name"])
+    assert search.results == [] and search.selectedHit == -1 and search.mirror == {}
+
+    search.search("50 100\n60 100\n70 100", "100.0", "", "10", "0", "0.01", "2")
+    search.useSpectrum(inspector.spectrum, inspector.compound["name"])  # while that search runs
+    assert not search.running
+    qtbot.wait(200)
+    assert search.results == []  # the old search's hits never land
+
+
+def test_query_rt_gives_hits_their_delta_rt(qtbot, bridges, tmp_path):
+    _, inspector, search = bridges
+    with qtbot.waitSignal(inspector.spectrumChanged, timeout=5000):
+        inspector.selectCompoundRow(1)  # cmp1: will be a hit with an RT
+    inspector.setSpectrumRt("5,5")
+    qtbot.waitUntil(lambda: inspector.spectrum.get("rt") == 5.5)
+    with qtbot.waitSignal(inspector.errorOccurred, timeout=1000):
+        inspector.setSpectrumRt("x")
+
+    with qtbot.waitSignal(search.resultsChanged, timeout=5000):
+        search.search("50 100\n60 100\n70 100", "100.0", "", "10", "0", "0.01", "2", "5")
+    by_name = {h["name"]: h for h in search.results}
+    assert by_name["cmp1"]["rt"] == 5.5 and by_name["cmp1"]["delta_rt"] == pytest.approx(0.5)
+    assert by_name["cmp0"]["rt"] is None and by_name["cmp0"]["delta_rt"] is None
+
+    search.useSpectrum(inspector.spectrum, "cmp1")
+    assert search.query["rt"] == "5.500"
+    path = write_mzml(tmp_path / "q.mzML", [dict(precursor_mz=100.0, rt_min=7.25)])
+    with qtbot.waitSignal(search.queryChanged, timeout=5000):
+        search.loadScan(str(path), "1")
+    assert search.query["rt"] == "7.250"
+
+
 def test_overview_issue_and_compare(qtbot, bridges):
     _, inspector, _ = bridges
     with qtbot.waitSignal(inspector.overviewChanged, timeout=5000):

@@ -238,6 +238,14 @@ Item {
                     }
                     CheckBox { text: qsTr("Remove precursor and peaks above it"); checked: page.p.removePrecursor; onToggled: Builder.setParam("removePrecursor", checked) }
                     CheckBox { text: qsTr("Normalize base peak to 1000"); checked: page.p.normalize; onToggled: Builder.setParam("normalize", checked) }
+                    CheckBox {
+                        text: qsTr("Store retention time with the spectra")
+                        checked: page.p.storeRt
+                        onToggled: Builder.setParam("storeRt", checked)
+                        ToolTip.visible: hovered
+                        ToolTip.delay: 600
+                        ToolTip.text: qsTr("The chosen scan's RT, or one set by hand in the review. Off for imaging runs.")
+                    }
                     Label {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
@@ -451,9 +459,37 @@ Item {
                         xTitle: qsTr("RT (min)")
                         yTitle: qsTr("MS1 intensity")
                         emptyText: Builder.eic.note || qsTr("Extracting chromatogram…")
+                        // A scan stick previews that scan; a point of the trace sets the row's RT.
                         onPeakClicked: x => {
                             var c = (Builder.eic.candidates || []).find(function (c) { return c.rt === x })
                             if (c) Builder.previewCandidate(c.index)
+                            else Builder.setRt(Builder.selectedGroup, x.toFixed(3))
+                        }
+                    }
+                    RowLayout {
+                        visible: Builder.selectedGroup >= 0 && page.p.storeRt
+                        Layout.leftMargin: 6
+                        Layout.rightMargin: 6
+                        Label { text: qsTr("RT stored (min)") }
+                        TextField {
+                            objectName: "rowRtField"
+                            Layout.preferredWidth: 90
+                            text: Builder.rowRt.text
+                            placeholderText: qsTr("none")
+                            validator: RegularExpressionValidator { regularExpression: /^\d*[.,]?\d*$/ }
+                            onEditingFinished: if (text !== Builder.rowRt.text) Builder.setRt(Builder.selectedGroup, text)
+                        }
+                        ToolButton {
+                            visible: Builder.rowRt.edited
+                            text: qsTr("↺ scan RT")
+                            onClicked: Builder.resetRt(Builder.selectedGroup)
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            color: Theme.mutedTextColor
+                            font.pixelSize: Theme.captionPixelSize
+                            text: qsTr("click the EIC to set it at the peak; empty = no RT")
                         }
                     }
                     Label {

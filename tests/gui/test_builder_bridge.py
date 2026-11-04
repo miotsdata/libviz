@@ -160,3 +160,33 @@ def test_selected_row_shows_its_eic_with_the_ms2_scans(qtbot, setup, tmp_path):
     assert len(groups["scans"]["peaks"]) + len(groups["chosen"]["peaks"]) == 2
     assert groups["chosen"]["peaks"][0][1] == pytest.approx(2000.0)  # interpolated at RT 1.05 (chosen: most intense)
     assert sorted(c["rt"] for c in b.eic["candidates"]) == pytest.approx([1.05, 1.15])
+
+
+def test_rt_is_the_chosen_scans_or_set_by_hand(qtbot, setup, tmp_path):
+    libraries, b = setup
+    mzml = write_mzml(tmp_path / "rt.mzML", [
+        dict(precursor_mz=MH, rt_min=2.0, collision_energy=20, mz=(138.0,), intensity=(100.0,)),
+        dict(precursor_mz=MH, rt_min=3.0, collision_energy=40, mz=(138.0,), intensity=(100.0,)),
+    ])
+    b.clearFiles()
+    b.addFiles([str(mzml)])
+    run(qtbot, b)
+    by_ce = {b.rows.row(k)["ce"]: b.rows.row(k)["index"] for k in range(b.rows.count)}
+    b.selectGroup(by_ce["20"])
+    assert b.rowRt == {"text": "2.000", "edited": False}
+    b.setRt(by_ce["20"], "2,1")
+    assert b.rowRt == {"text": "2.100", "edited": True} and b.rows.row(by_ce["20"])["rt"] == "2.10 ✎"
+    b.setRt(by_ce["40"], "")  # no RT for this one
+    with qtbot.waitSignal(b.errorOccurred, timeout=1000):
+        b.setRt(by_ce["20"], "abc")
+
+    Library.create(tmp_path / "lib.db", name="Std")
+    with qtbot.waitSignal(libraries.libraryOpened, timeout=5000):
+        libraries.openLibrary(str(tmp_path / "lib.db"))
+    with qtbot.waitSignal(b.committed, timeout=10_000):
+        b.commit(libraries.selectedKey, False)
+    lib = Library.load_from_db(tmp_path / "lib.db")
+    spectra = lib.get_compound_spectra(lib.search_compounds()[0]["id"])
+    assert {s["collision_energy"]: s["rt"] for s in spectra} == {20.0: pytest.approx(2.1), 40.0: None}
+    b.resetRt(by_ce["20"])
+    assert b.rowRt["text"] == "2.000"
