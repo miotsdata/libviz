@@ -118,6 +118,10 @@ Changes are written to the library immediately and can't be undone. Use
    them to a library (step 5).
 2. **mzML files:** centroided MS2 (convert with msconvert,
    `peakPicking true 1-`). DDA, DIA and imaging runs all work.
+   Each file is parsed once into `file.mzML.db` next to it, or into the user
+   cache folder if that folder is read-only. Later searches reuse it, and it
+   is rebuilt automatically when the mzML changes. Delete these files to free
+   space.
 3. **Parameters:**
    - precursor tolerance (ppm)
    - default adducts per polarity
@@ -127,6 +131,10 @@ Changes are written to the library immediately and can't be undone. Use
    - how scans are ranked
 4. **Find spectra**, then **review**:
    - There is one row per compound/adduct/collision energy.
+   - Above the spectrum, the **EIC** of the row's precursor m/z (MS1, one
+     trace per file) shows where the real peak is. The MS2 scans are sticks
+     at their RT, with the chosen one in red. Click one to preview it. The
+     EIC needs centroided MS1 too (`peakPicking true 1-`).
    - The best-ranked scan is pre-chosen. Click another candidate to compare
      it with the chosen one (mirror plot), then *Use this scan*, or
      double-click it.

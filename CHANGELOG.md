@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- mzML builder: an EIC of the selected row's precursor (MS1) above the spectrum, with the MS2 scans marked at their RT, to see the real peak and pick the scan on it.
+- mzML files are parsed once into a SQLite database next to them (`run.mzML.db`, MSIAnalyzer's raw schema) and reused: later searches don't re-read the XML (ADR 8).
 - mzML builder: explore without a target list by typing an m/z or formula and an adduct. Each hand-entered target is identified when added to a library, as an existing compound of that library or a new one.
 
 ### Changed

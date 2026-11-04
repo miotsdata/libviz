@@ -10,6 +10,7 @@ src/libviz/
     db/                   SQLAlchemy models + alembic migrations (src/libviz/migrations)
     readers/msp_reader.py bulk MSP import
     readers/mzml_reader.py streaming MS2 reader (lxml), decodes only kept scans
+    readers/mzml_db.py   parsed mzML database (MSIAnalyzer's raw schema), MS2 matching + EIC (ADR 8)
     builder.py            target list + mzML -> candidate spectra -> commit (ADR 4)
     writers/msp_writer.py streaming MSP export (ADR 5)
     similarity.py         greedy (modified) cosine, peak-list parsing (ADR 6)

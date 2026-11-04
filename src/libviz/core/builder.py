@@ -22,7 +22,8 @@ from pathlib import Path
 
 import numpy as np
 
-from libviz.core.readers.mzml_reader import Ms2Scan, count_spectra, iter_ms2
+from libviz.core.readers.mzml_db import iter_ms2_db, parsed_db
+from libviz.core.readers.mzml_reader import Ms2Scan, count_spectra
 from libviz.core.utils.mass_utils import adduct_mz, calculate_exact_mass, infer_precursor_delta, neutral_mass
 
 logger = logging.getLogger(__name__)
@@ -350,7 +351,8 @@ def find_candidates(targets: Sequence[Target], mzml_files: Sequence[Path | str],
     for file_number, path in enumerate(mzml_files):
         base = sum(totals[:file_number])
         file_progress = (lambda done, _total, base=base: progress(base + done, sum(totals))) if progress else None
-        for scan in iter_ms2(Path(path), keep, file_progress):
+        db = parsed_db(Path(path), file_progress)  # parsed once, then reused (ADR 8)
+        for scan in iter_ms2_db(db, Path(path).name, keep):
             for k, ppm in scan_matches:
                 target_mz, target_index, adduct, polarity = ions[k]
                 ce = scan.collision_energy if scan.collision_energy is not None else 0.0

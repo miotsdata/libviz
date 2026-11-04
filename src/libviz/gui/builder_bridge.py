@@ -7,6 +7,7 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 
 from libviz.core import builder
 from libviz.core.builder import BuildParams, BuildResult, Group
+from libviz.core.readers.mzml_db import db_path_for, eic, profile_ms1_skipped
 from libviz.gui.dict_model import DictListModel
 from libviz.gui.library_bridge import LibraryBridge, to_local_path
 from libviz.gui.worker import start_task
@@ -79,6 +80,8 @@ class BuilderBridge(QObject):
         self._conflicts = -1
         self._compound_matches: list[dict] = []
         self._match_request = 0  # only the newest search (typing) is shown
+        # (m/z, polarity) -> [(file name, rt array, intensity array)], per run.
+        self._eics: dict[tuple, list] = {}
         self._rows = DictListModel(["index", "target", "formula", "adduct", "polarity", "mz", "ce", "n",
                                     "chosen", "status", "ppm", "rt", "file"], self)
 
@@ -220,6 +223,7 @@ class BuilderBridge(QObject):
         def done(result):
             self._set_status("")
             self._result = result
+            self._eics = {}
             self._selected = -1
             self._rows.set_rows([self._row(i, g) for i, g in enumerate(result.groups)])
             self.resultChanged.emit()
@@ -230,6 +234,7 @@ class BuilderBridge(QObject):
     @Slot()
     def backToSetup(self):
         self._result = None
+        self._eics = {}
         self._selected = -1
         self._rows.set_rows([])
         self.resultChanged.emit()
@@ -279,6 +284,57 @@ class BuilderBridge(QObject):
         self._preview = -1 if group is None or not group.candidates else (
             group.chosen if group.chosen is not None else 0)
         self.selectionChanged.emit()
+        if group is not None:
+            self._load_eic(group)
+
+    def _load_eic(self, group: Group):
+        key = (round(group.target_mz, 5), group.polarity)
+        if key in self._eics:
+            return
+        files, ppm, result = list(self._result.files), self._params.ppm, self._result
+
+        def compute():
+            out, profile = [], []
+            for f in files:
+                db = db_path_for(f)
+                rt, intensity = eic(db, group.target_mz, ppm, group.polarity)
+                if len(rt):
+                    out.append((Path(f).name, rt, intensity))
+                elif profile_ms1_skipped(db):
+                    profile.append(Path(f).name)
+            return out, profile
+
+        def done(series_profile):
+            if self._result is result:
+                self._eics[key] = series_profile
+                self.selectionChanged.emit()
+        start_task(self, compute, on_success=done, on_error=self.errorOccurred)
+
+    @Property("QVariantMap", notify=selectionChanged)
+    def eic(self) -> dict:
+        """The selected row's EIC per file ({key, name, peaks: [[rt, int]]}),
+        and its MS2 candidates as sticks at their RT, the chosen one apart."""
+        group = self._group()
+        cached = self._eics.get((round(group.target_mz, 5), group.polarity)) if group else None
+        if cached is None:
+            return {}
+        series, profile = cached
+        note = ("No EIC: MS1 is in profile mode in " + ", ".join(profile)
+                + ". Centroid MS1 too (msconvert peakPicking 1-)." if profile else "No MS1 scans with RT in these files.")
+        by_file = {name: (rt, intensity) for name, rt, intensity in series}
+        groups = [{"key": f"eic{i}", "name": name, "peaks": np.column_stack([rt, y]).tolist()}
+                  for i, (name, rt, y) in enumerate(series)]
+        scans, chosen, candidates = [], [], []
+        for j, c in enumerate(group.candidates):
+            if c.rt_min is None or c.file not in by_file:
+                continue
+            rt, y = by_file[c.file]
+            point = [c.rt_min, float(np.interp(c.rt_min, rt, y))]
+            (chosen if j == group.chosen else scans).append(point)
+            candidates.append({"rt": c.rt_min, "index": j})
+        groups.append({"key": "scans", "name": "MS2 scans" if scans else "", "peaks": scans})
+        groups.append({"key": "chosen", "name": "Chosen" if chosen else "", "peaks": chosen})
+        return {"groups": groups, "candidates": candidates, "note": note}
 
     @Slot(int)
     def previewCandidate(self, index: int):

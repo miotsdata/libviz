@@ -288,7 +288,7 @@ Item {
             anchors.centerIn: parent
             color: Theme.textColor
             text: plot._hoverPeak
-                  ? "m/z " + plot._hoverPeak.x.toFixed(4) + "\nintensity "
+                  ? plot.xTitle + " " + plot._hoverPeak.x.toFixed(4) + "\nintensity "
                     + plot._formatValue(plot.mirrored ? Math.abs(plot._hoverPeak.y) : plot._hoverPeak.y)
                   : ""
         }

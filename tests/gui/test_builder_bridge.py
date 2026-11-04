@@ -138,3 +138,25 @@ def test_hand_entered_target_is_identified_as_existing_compound(qtbot, setup, tm
         b.commit(key, False)
     [compound] = Library.load_from_db(tmp_path / "lib.db").search_compounds()
     assert compound["n_spectra"] == 3  # existing + CE 20 + CE 40 (DIA), all on the one compound
+
+
+def test_selected_row_shows_its_eic_with_the_ms2_scans(qtbot, setup, tmp_path):
+    _, b = setup
+    ms1 = dict(ms_level=1, mz=(MH, 300.0), intensity=(1000.0, 1.0))
+    mzml = write_mzml(tmp_path / "lc.mzML", [
+        dict(ms1, rt_min=1.0), dict(precursor_mz=MH, rt_min=1.05, mz=(138.0,), intensity=(100.0,)),
+        dict(ms1, rt_min=1.1, intensity=(3000.0, 1.0)), dict(precursor_mz=MH, rt_min=1.15, mz=(138.0,), intensity=(9.0,)),
+        dict(ms1, rt_min=1.2, intensity=(500.0, 1.0)),
+    ])
+    b.clearFiles()
+    b.addFiles([str(mzml)])
+    run(qtbot, b)
+    i = next(r["index"] for r in (b.rows.row(k) for k in range(b.rows.count)) if r["n"] == 2)
+    b.selectGroup(i)
+    qtbot.waitUntil(lambda: bool(b.eic), timeout=5000)
+    groups = {g["key"]: g for g in b.eic["groups"]}
+    assert groups["eic0"]["name"] == "lc.mzML"
+    assert [p[1] for p in groups["eic0"]["peaks"]] == [1000.0, 3000.0, 500.0]
+    assert len(groups["scans"]["peaks"]) + len(groups["chosen"]["peaks"]) == 2
+    assert groups["chosen"]["peaks"][0][1] == pytest.approx(2000.0)  # interpolated at RT 1.05 (chosen: most intense)
+    assert sorted(c["rt"] for c in b.eic["candidates"]) == pytest.approx([1.05, 1.15])

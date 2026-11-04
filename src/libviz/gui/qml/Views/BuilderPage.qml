@@ -437,6 +437,25 @@ Item {
                 ColumnLayout {
                     SplitView.fillHeight: true
                     spacing: 0
+                    // EIC of the row's precursor m/z (MS1), with its MS2 scans:
+                    // where the real peak is, and which scan sits on it.
+                    StickPlot {
+                        objectName: "eicPlot"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: parent.height * 0.4
+                        Layout.margins: 4
+                        visible: Builder.selectedGroup >= 0
+                        groups: Builder.eic.groups || []
+                        colors: ({ eic0: Theme.plotStrongColor, eic1: Theme.plotWeakColor, eic2: "#2ca02c", eic3: "#9467bd",
+                                   scans: Theme.plotAccentColor, chosen: Theme.plotSecondColor })
+                        xTitle: qsTr("RT (min)")
+                        yTitle: qsTr("MS1 intensity")
+                        emptyText: Builder.eic.note || qsTr("Extracting chromatogram…")
+                        onPeakClicked: x => {
+                            var c = (Builder.eic.candidates || []).find(function (c) { return c.rt === x })
+                            if (c) Builder.previewCandidate(c.index)
+                        }
+                    }
                     Label {
                         Layout.margins: 6
                         Layout.fillWidth: true

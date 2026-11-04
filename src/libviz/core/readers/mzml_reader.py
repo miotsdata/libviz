@@ -1,9 +1,10 @@
-"""Streaming mzML reader for MS2 scans (ADR 4).
+"""Streaming mzML reader (ADR 4, ADR 8).
 
 lxml ``iterparse`` over ``<spectrum>`` elements, reading cvParams by
 accession; each element is freed after use, so memory stays flat on
-multi-GB (spatial) files. Peak arrays are decoded only for scans the caller
-keeps, which is what makes scanning a large file for a few targets cheap.
+multi-GB (spatial) files. :func:`iter_ms2` decodes peak arrays only for the
+scans the caller keeps; :func:`iter_spectra` reads every MS1/MS2 scan (to
+build the parsed database, :mod:`libviz.core.readers.mzml_db`).
 """
 import base64
 import logging
@@ -31,6 +32,7 @@ SELECTED_MZ = "MS:1000744"
 PEAK_INTENSITY = "MS:1000042"
 COLLISION_ENERGY = "MS:1000045"
 CHARGE = "MS:1000041"
+FILTER_STRING = "MS:1000512"
 
 FLOAT64, FLOAT32 = "MS:1000523", "MS:1000521"
 ZLIB, NO_COMPRESSION = "MS:1000574", "MS:1000576"
@@ -38,9 +40,10 @@ MZ_ARRAY, INTENSITY_ARRAY = "MS:1000514", "MS:1000515"
 
 
 @dataclass
-class Ms2Scan:
+class Scan:
+    """One spectrum; precursor/isolation fields are None for MS1."""
     file: str
-    scan_id: str
+    scan_id: str  # native id, e.g. "controllerType=0 controllerNumber=1 scan=6"
     index: int
     polarity: str | None  # "POSITIVE" / "NEGATIVE"
     rt_min: float | None
@@ -53,12 +56,19 @@ class Ms2Scan:
     tic: float | None
     mz: np.ndarray = field(default_factory=lambda: np.empty(0))
     intensity: np.ndarray = field(default_factory=lambda: np.empty(0))
+    ms_level: int = 2
+    profile: bool = False
+    filter_string: str = ""
+    parent_id: str | None = None  # native id of the precursor's MS1 scan
 
     @property
     def isolation_width(self) -> float | None:
         if self.isolation_lower is None or self.isolation_upper is None:
             return None
         return self.isolation_upper - self.isolation_lower
+
+
+Ms2Scan = Scan  # the name before MS1 was read too
 
 
 def _local(tag: str) -> str:
@@ -109,7 +119,7 @@ def _decode_arrays(elem) -> tuple[np.ndarray, np.ndarray]:
     return mz[:n], intensity[:n]
 
 
-def _scan_from(elem, file: str, p: dict) -> Ms2Scan:
+def _scan_from(elem, file: str, p: dict) -> Scan:
     rt, unit = p.get(SCAN_START_TIME, (None, ""))
     rt = _float(rt)
     if rt is not None and unit.lower().startswith("second"):
@@ -120,7 +130,8 @@ def _scan_from(elem, file: str, p: dict) -> Ms2Scan:
     upper = _float(p.get(ISO_UPPER, (None,))[0])
     center = target if target is not None else selected
     charge = _float(p.get(CHARGE, (None,))[0])
-    return Ms2Scan(
+    precursor = elem.find(".//{*}precursor")
+    return Scan(
         file=file,
         scan_id=elem.get("id", ""),
         index=int(elem.get("index", 0)),
@@ -133,6 +144,10 @@ def _scan_from(elem, file: str, p: dict) -> Ms2Scan:
         isolation_upper=center + upper if center is not None and upper is not None else None,
         collision_energy=_float(p.get(COLLISION_ENERGY, (None,))[0]),
         tic=_float(p.get(TIC, (None,))[0]),
+        ms_level=int(p.get(MS_LEVEL, ("1",))[0] or 1),
+        profile=PROFILE in p,
+        filter_string=p.get(FILTER_STRING, ("",))[0] or "",
+        parent_id=precursor.get("spectrumRef") if precursor is not None else None,
     )
 
 
@@ -144,15 +159,9 @@ def count_spectra(path: Path) -> int:
     return 0
 
 
-def iter_ms2(path: Path, keep: Callable[[Ms2Scan], bool] = lambda scan: True,
-             progress: Callable[[int, int], None] | None = None) -> Iterator[Ms2Scan]:
-    """Yield the MS2 scans of ``path`` for which ``keep(scan)`` is true, with
-    their peaks decoded. ``keep`` sees the scan without peaks.
-
-    Raises ``ValueError`` on profile-mode MS2: library spectra must be
-    centroided (msconvert ``--filter "peakPicking true 1-"``).
-    """
-    path = Path(path)
+def _spectra(path: Path, progress: Callable[[int, int], None] | None):
+    """(element, cvParams) of every ``<spectrum>``; the element is freed
+    once the consumer moves on."""
     total = count_spectra(path) if progress else 0
     groups: dict[str, dict] = {}
     n = 0
@@ -162,15 +171,7 @@ def iter_ms2(path: Path, keep: Callable[[Ms2Scan], bool] = lambda scan: True,
                 groups[elem.get("id")] = _params(elem, groups)
                 continue
             n += 1
-            p = _params(elem, groups)
-            if p.get(MS_LEVEL, (None,))[0] == "2":
-                if PROFILE in p:
-                    raise ValueError(f"{path.name}: MS2 spectra are in profile mode; centroid them first "
-                                     "(e.g. msconvert --filter \"peakPicking true 1-\").")
-                scan = _scan_from(elem, path.name, p)
-                if keep(scan):
-                    scan.mz, scan.intensity = _decode_arrays(elem)
-                    yield scan
+            yield elem, _params(elem, groups)
             # free the element and already-processed siblings
             elem.clear()
             parent = elem.getparent()
@@ -182,13 +183,52 @@ def iter_ms2(path: Path, keep: Callable[[Ms2Scan], bool] = lambda scan: True,
         progress(total, total)
 
 
-def read_scan(path: Path, scan: int | str) -> Ms2Scan:
+def _profile_error(path: Path) -> ValueError:
+    return ValueError(f"{path.name}: MS2 spectra are in profile mode; centroid them first "
+                      "(e.g. msconvert --filter \"peakPicking true 1-\").")
+
+
+def iter_ms2(path: Path, keep: Callable[[Scan], bool] = lambda scan: True,
+             progress: Callable[[int, int], None] | None = None) -> Iterator[Scan]:
+    """Yield the MS2 scans of ``path`` for which ``keep(scan)`` is true, with
+    their peaks decoded. ``keep`` sees the scan without peaks.
+
+    Raises ``ValueError`` on profile-mode MS2: library spectra must be
+    centroided (msconvert ``--filter "peakPicking true 1-"``).
+    """
+    path = Path(path)
+    for elem, p in _spectra(path, progress):
+        if p.get(MS_LEVEL, (None,))[0] == "2":
+            if PROFILE in p:
+                raise _profile_error(path)
+            scan = _scan_from(elem, path.name, p)
+            if keep(scan):
+                scan.mz, scan.intensity = _decode_arrays(elem)
+                yield scan
+
+
+def iter_spectra(path: Path, progress: Callable[[int, int], None] | None = None) -> Iterator[Scan]:
+    """Every MS1 and MS2 scan of ``path`` with peaks decoded, except profile
+    MS1 (yielded with ``profile=True`` and no peaks: too large to keep, and
+    not usable as centroids). Profile MS2 raises, as in :func:`iter_ms2`."""
+    path = Path(path)
+    for elem, p in _spectra(path, progress):
+        scan = _scan_from(elem, path.name, p)
+        if scan.ms_level == 2 and scan.profile:
+            raise _profile_error(path)
+        if scan.ms_level in (1, 2) and not scan.profile:
+            scan.mz, scan.intensity = _decode_arrays(elem)
+        if scan.ms_level in (1, 2):
+            yield scan
+
+
+def read_scan(path: Path, scan: int | str) -> Scan:
     """One MS2 scan by number: matches ``scan=N`` in the native id (Thermo,
     msconvert), else the 0-based spectrum index."""
     scan = str(scan).strip()
     token = f"scan={scan}"
 
-    def wanted(s: Ms2Scan) -> bool:
+    def wanted(s: Scan) -> bool:
         return token in s.scan_id.split() or s.scan_id == scan or str(s.index) == scan
     for s in iter_ms2(Path(path), wanted):
         return s
