@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Fixed
+- Windows build: every plot (spectrum, mirror, EIC) crashed the app, because `Qt6Graphs2DImpl.dll` was missing from the bundle and never loaded. It is now bundled and loaded at startup (same fix as MSIAnalyzer). The release smoke test now draws a plot, so a regression fails the Windows build.
 - Spectral search: loading a new query (*Search similar*, *Load mzML scan…*) left the previous hits on screen as if they belonged to it.
 
 ### Added

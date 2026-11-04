@@ -42,3 +42,18 @@ MSIAnalyzer. MSIAnalyzer installs libviz from PyPI.
   placeholder PNG needs Pillow, which libviz doesn't depend on.
 - The Windows and AppImage builds have only run on GitHub, not locally
   (the PyInstaller onedir build and its smoke test were checked on Linux).
+
+## Addendum (2026-11-04): Qt Graphs on Windows
+
+- **The problem:** `Qt6Graphs2DImpl.dll` holds Qt Graphs' `QtGraphs2D.impl`
+  QML module. No Windows DLL imports it, so PyInstaller never bundled it and
+  nothing loaded it. Every Qt Graphs plot then crashed (found in
+  MSIAnalyzer, its commit 94074b3).
+- **The fix:**
+  - The spec collects the DLL and keeps it out of the unreachable-lib
+    pruning.
+  - `gui/main.py:load_qt_graphs_2d_impl` loads it on Windows before any
+    QML.
+- **Smoke test:** `LIBVIZ_SMOKE_TEST` now also creates a `StickPlot` with
+  peaks in a window and lets it render for 1 s. Compiling the views was not
+  enough to catch this crash.

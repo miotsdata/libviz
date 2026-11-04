@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QUrl
@@ -20,6 +21,40 @@ from libviz.gui.search_bridge import SearchBridge
 # QML is loaded straight from the package directory, not compiled into a
 # qrc module: no rcc step, no generated file to keep in sync (ADR 2).
 QML_DIR = Path(__file__).parent / "qml"
+
+
+def load_qt_graphs_2d_impl() -> None:
+    """Load Qt6Graphs2DImpl.dll on Windows, before any QML.
+
+    It holds Qt Graphs' `QtGraphs2D.impl` QML module, which registers itself
+    when the DLL loads. On Linux libQt6Graphs links it, but no Windows DLL
+    imports it, so nothing ever loaded it: every Qt Graphs plot (spectrum,
+    mirror, EIC) then crashed the app ("QtGraphs2D.impl module's qmldir file
+    not found", then an access violation in Qt6Core). Same fix as MSIAnalyzer.
+    """
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    import PySide6
+
+    dll = Path(PySide6.__file__).parent / "Qt6Graphs2DImpl.dll"
+    if dll.exists():
+        ctypes.WinDLL(str(dll))
+    else:
+        logging.getLogger(__name__).warning("%s is missing: Qt Graphs plots will crash", dll)
+
+
+# Smoke test: one real plot, created and rendered (compiling the views is not
+# enough: the Windows Qt Graphs crash happened only when a plot was made).
+_SMOKE_PLOT_QML = b"""
+import QtQuick
+import "Views"
+Window {
+    width: 400; height: 300; visible: true
+    StickPlot { anchors.fill: parent; groups: [{ key: "a", name: "a", peaks: [[100, 1000], [150, 500]] }] }
+}
+"""
 
 
 def build_engine(bridges: dict[str, object]) -> QQmlApplicationEngine:
@@ -59,6 +94,7 @@ def main() -> int:
     # Fusion, not Material: Material + the native FileDialog froze the app on
     # GNOME in MSIAnalyzer; Fusion follows our explicit palette (Theme.qml).
     QQuickStyle.setStyle(os.environ.get("LIBVIZ_QT_STYLE", "Fusion"))
+    load_qt_graphs_2d_impl()
     app = QGuiApplication(sys.argv)
     app.setOrganizationName("LibViz")
     app.setApplicationName("LibViz")
@@ -74,6 +110,15 @@ def main() -> int:
             component = QQmlComponent(engine, QUrl.fromLocalFile(str(qml)))
             if component.isError():
                 raise RuntimeError(f"{qml.name}: {component.errorString()}")
+        plot = QQmlComponent(engine)
+        plot.setData(_SMOKE_PLOT_QML, QUrl.fromLocalFile(str(QML_DIR / "smoke.qml")))
+        window = plot.create()
+        if window is None:
+            raise RuntimeError(f"plot: {plot.errorString()}")
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:  # let it render a few frames
+            app.processEvents()
+            time.sleep(0.02)
         with tempfile.TemporaryDirectory() as tmp:
             Library.create(Path(tmp) / "smoke.db", name="smoke").close()
         print("LIBVIZ_SMOKE_TEST ok", flush=True)

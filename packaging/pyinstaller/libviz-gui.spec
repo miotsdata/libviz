@@ -17,6 +17,19 @@ PKG = SRC_ROOT / "libviz"
 
 sys.path.insert(0, str(SRC_ROOT))
 
+# Qt Graphs' 2D internals (the `QtGraphs2D.impl` QML module, embedded in
+# Qt6Graphs2DImpl) are linked by libQt6Graphs on Linux, but no Windows DLL
+# imports Qt6Graphs2DImpl.dll. PyInstaller's import walk never collects it,
+# and without it every Qt Graphs plot crashes (access violation in Qt6Core).
+# Collected by hand here and loaded by gui/main.py (load_qt_graphs_2d_impl).
+# Same fix as MSIAnalyzer (commit 94074b3).
+import PySide6  # noqa: E402
+
+_GRAPHS_2D_IMPL = Path(PySide6.__file__).parent / "Qt6Graphs2DImpl.dll"
+EXTRA_BINARIES = [(str(_GRAPHS_2D_IMPL), "PySide6")] if _GRAPHS_2D_IMPL.exists() else []
+# Kept by the pruning below although nothing imports them (see above).
+ALWAYS_KEEP_LIBS = {"qt6graphs2dimpl.dll"}
+
 excludes = [
     "pytest", "_pytest", "pytestqt", "pylint", "astroid", "hupper",
     "archunitpython", "IPython", "jedi", "parso", "PyInstaller",
@@ -25,7 +38,7 @@ excludes = [
 a = Analysis(
     [str(PKG / "gui" / "main.py")],
     pathex=[str(SRC_ROOT)],
-    binaries=[],
+    binaries=EXTRA_BINARIES,
     datas=[
         # gui/main.py loads QML from files next to itself (ADR 2); as the
         # entry script it runs from the bundle root, so qml/ goes there.
@@ -91,7 +104,7 @@ def _unreachable_qt_libs(binaries) -> set[str]:
             if key in candidates and key not in reached:
                 reached.add(key)
                 todo.append(candidates[key])
-    return set(candidates) - reached
+    return set(candidates) - reached - ALWAYS_KEEP_LIBS
 
 
 def _is_unwanted(path: str) -> bool:
