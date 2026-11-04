@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 
 from libviz.core.readers.mzml_reader import Ms2Scan, count_spectra, iter_ms2
-from libviz.core.utils.mass_utils import adduct_mz, calculate_exact_mass, infer_precursor_delta
+from libviz.core.utils.mass_utils import adduct_mz, calculate_exact_mass, infer_precursor_delta, neutral_mass
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +46,58 @@ class Target:
     adducts: tuple[str, ...] = ()  # empty: the build's default adducts
     rt_min: float | None = None  # minutes
     rt_max: float | None = None
+    # Hand-entered target ("m/z 195.0877 [M+H]+"): explored without an
+    # identity; :func:`identify` sets name/InChIKey before :func:`commit`.
+    query: str = ""
+
+    @property
+    def identified(self) -> bool:
+        return bool(self.inchikey)
 
 
 class TargetListError(ValueError):
     pass
+
+
+def manual_target(formula_or_mz: str, adduct: str) -> Target:
+    """A target typed by hand: a precursor m/z or a neutral formula, with one adduct."""
+    text, adduct = formula_or_mz.strip(), adduct.strip()
+    try:
+        infer_precursor_delta(adduct)
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        raise TargetListError(f"unknown adduct {adduct!r}") from e
+    try:
+        mz = float(text.replace(",", "."))
+    except ValueError:
+        mz = None
+    if mz is not None:
+        if mz <= 0:
+            raise TargetListError("m/z must be positive")
+        query = f"m/z {mz:.4f} {adduct}"
+        return Target(name=query, formula="", inchikey="", exact_mass=neutral_mass(mz, adduct),
+                      adducts=(adduct,), query=query)
+    exact_mass = calculate_exact_mass(text, 6)
+    if exact_mass is None:
+        raise TargetListError(f"{text!r} is neither an m/z nor a valid formula")
+    query = f"{text} {adduct}"
+    return Target(name=query, formula=text, inchikey="", exact_mass=exact_mass, adducts=(adduct,), query=query)
+
+
+def identify(target: Target, name: str, inchikey: str, formula: str = "", smiles: str | None = None):
+    """Give a hand-entered target the compound it is added as (new, or an
+    existing one of the library: commit matches compounds by InChIKey)."""
+    name, inchikey, formula = name.strip(), inchikey.strip().upper(), formula.strip()
+    if not name:
+        raise TargetListError("the compound needs a name")
+    if not _INCHIKEY_RE.match(inchikey):
+        raise TargetListError(f"invalid InChIKey {inchikey!r}")
+    if formula:
+        exact_mass = calculate_exact_mass(formula, 6)
+        if exact_mass is None:
+            raise TargetListError(f"invalid formula {formula!r}")
+        target.exact_mass = exact_mass
+    target.name, target.inchikey, target.formula = name, inchikey, formula or target.formula
+    target.smiles = (smiles or "").strip() or None
 
 
 _COLUMN_ALIASES = {
@@ -388,6 +436,10 @@ def commit(library, result: BuildResult, on_conflict: str = "skip") -> dict[str,
 
     if on_conflict not in CONFLICT_POLICIES:
         raise ValueError(f"on_conflict must be one of {CONFLICT_POLICIES}")
+    unidentified = {result.targets[g.target_index].query for g in result.groups
+                    if g.chosen is not None and not result.targets[g.target_index].identified}
+    if unidentified:
+        raise ValueError(f"identify these targets first: {', '.join(sorted(unidentified))}")
     counts = {"added": 0, "replaced": 0, "skipped": 0}
     with library.session_scope() as session:
         compounds: dict[str, Compound] = {}

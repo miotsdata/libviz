@@ -93,6 +93,33 @@ Item {
                               : qsTr("CSV/TSV with name, formula, inchikey; optional smiles, pubchem_id, adducts, rt or rt_min/rt_max")
                     }
                 }
+                RowLayout {
+                    Layout.leftMargin: 10
+                    Layout.rightMargin: 10
+                    Label { text: qsTr("or by hand:"); color: Theme.mutedTextColor }
+                    TextField {
+                        id: manualQuery
+                        objectName: "manualQuery"
+                        Layout.fillWidth: true
+                        placeholderText: qsTr("Precursor m/z or formula")
+                        onAccepted: addManual.clicked()
+                    }
+                    TextField {
+                        id: manualAdduct
+                        Layout.preferredWidth: 110
+                        text: "[M+H]+"
+                        onAccepted: addManual.clicked()
+                    }
+                    Button {
+                        id: addManual
+                        text: qsTr("Add")
+                        enabled: manualQuery.text.trim() !== "" && manualAdduct.text.trim() !== ""
+                        onClicked: { Builder.addManualTarget(manualQuery.text, manualAdduct.text); manualQuery.text = "" }
+                        ToolTip.visible: hovered
+                        ToolTip.delay: 600
+                        ToolTip.text: qsTr("Explore without a target list; the compound is chosen when adding to a library")
+                    }
+                }
                 Label {
                     visible: Builder.targetCount > 0
                     Layout.leftMargin: 10
@@ -118,11 +145,13 @@ Item {
                     ScrollBar.vertical: ScrollBar {}
                     delegate: RowLayout {
                         required property var modelData
+                        required property int index
                         width: ListView.view.width
                         Label { text: modelData.name; Layout.preferredWidth: 220; elide: Text.ElideRight }
                         Label { text: modelData.formula; Layout.preferredWidth: 120; color: Theme.mutedTextColor }
                         Label { text: modelData.adducts; Layout.preferredWidth: 140; color: Theme.mutedTextColor; elide: Text.ElideRight }
-                        Label { text: modelData.rt ? "RT " + modelData.rt : ""; color: Theme.mutedTextColor }
+                        Label { text: modelData.rt ? "RT " + modelData.rt : ""; color: Theme.mutedTextColor; Layout.fillWidth: true }
+                        ToolButton { text: "✕"; onClicked: Builder.removeTarget(index) }
                     }
                 }
 
@@ -462,8 +491,10 @@ Item {
         title: qsTr("Add spectra to library")
         anchors.centerIn: parent
         modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
         property var choices: Libraries.libraries
+        readonly property string key: libraryBox.currentIndex >= 0 && libraryBox.currentIndex < choices.length
+                                      ? choices[libraryBox.currentIndex].key : ""
+        readonly property bool identified: Builder.manualTargets.every(function (t) { return t.identified })
         function openFor(key) {
             var i = choices.findIndex(function (l) { return l.key === key })
             libraryBox.currentIndex = i >= 0 ? i : (choices.length ? 0 : -1)
@@ -471,8 +502,11 @@ Item {
             open()
         }
         onAccepted: {
-            if (libraryBox.currentIndex >= 0)
-                Builder.commit(choices[libraryBox.currentIndex].key, replaceBox.checked)
+            if (key) Builder.commit(key, replaceBox.checked)
+        }
+        footer: DialogButtonBox {
+            Button { text: qsTr("OK"); enabled: commitDialog.key !== "" && commitDialog.identified; DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+            Button { text: qsTr("Cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
         }
         ColumnLayout {
             spacing: 8
@@ -487,6 +521,30 @@ Item {
                 Button { text: qsTr("New library…"); onClicked: { commitDialog.close(); page.newLibraryRequested() } }
             }
             Label {
+                visible: Builder.manualTargets.length > 0
+                Layout.topMargin: 6
+                text: qsTr("Hand-entered targets: which compound are they?")
+                font.bold: true
+            }
+            Repeater {
+                model: Builder.manualTargets
+                RowLayout {
+                    required property var modelData
+                    Label { text: modelData.query; Layout.preferredWidth: 180; elide: Text.ElideRight }
+                    Label {
+                        Layout.preferredWidth: 200
+                        elide: Text.ElideRight
+                        text: modelData.identified ? "→ " + modelData.name : qsTr("not identified")
+                        color: modelData.identified ? Theme.successColor : Theme.warningColor
+                    }
+                    Button {
+                        text: qsTr("Identify…")
+                        enabled: commitDialog.key !== ""
+                        onClicked: identifyDialog.openFor(modelData, commitDialog.key)
+                    }
+                }
+            }
+            Label {
                 visible: Builder.conflictCount > 0
                 text: qsTr("%1 of them already have a spectrum for the same compound, adduct, polarity and CE.").arg(Builder.conflictCount)
                 color: Theme.warningColor
@@ -494,6 +552,83 @@ Item {
                 Layout.maximumWidth: 420
             }
             CheckBox { id: replaceBox; visible: Builder.conflictCount > 0; text: qsTr("Replace the existing spectra (otherwise keep them)") }
+        }
+    }
+
+    // A hand-entered target becomes an existing compound of the library, or a new one.
+    Dialog {
+        id: identifyDialog
+        objectName: "identifyDialog"
+        title: qsTr("Identify %1").arg(target.query || "")
+        anchors.centerIn: parent
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        property var target: ({})
+        property string key
+        function openFor(t, libraryKey) {
+            target = t; key = libraryKey
+            existingRadio.checked = true
+            searchField.text = ""; matchList.currentIndex = -1
+            newName.text = ""; newInchikey.text = t.inchikey || ""; newFormula.text = t.formula || ""; newSmiles.text = ""
+            Builder.findCompounds(key, t.index, "")
+            open()
+        }
+        onAccepted: {
+            var c = Builder.compoundMatches[matchList.currentIndex]
+            if (existingRadio.checked && c)
+                Builder.identify(target.index, c.name, c.inchikey, c.formula, "")
+            else if (newRadio.checked)
+                Builder.identify(target.index, newName.text, newInchikey.text, newFormula.text, newSmiles.text)
+            Builder.countConflicts(key)
+        }
+        ColumnLayout {
+            spacing: 6
+            RadioButton { id: existingRadio; text: qsTr("Add to an existing compound of the library") }
+            TextField {
+                id: searchField
+                enabled: existingRadio.checked
+                Layout.fillWidth: true
+                placeholderText: qsTr("Search name, formula or InChIKey (empty: same mass)")
+                onTextEdited: Builder.findCompounds(identifyDialog.key, identifyDialog.target.index, text)
+            }
+            ListView {
+                id: matchList
+                enabled: existingRadio.checked
+                Layout.preferredWidth: 480
+                Layout.preferredHeight: 160
+                clip: true
+                model: Builder.compoundMatches
+                ScrollBar.vertical: ScrollBar {}
+                delegate: ItemDelegate {
+                    required property var modelData
+                    required property int index
+                    width: ListView.view.width
+                    highlighted: ListView.isCurrentItem
+                    text: modelData.name + "  ·  " + modelData.formula + "  ·  " + modelData.inchikey
+                    onClicked: matchList.currentIndex = index
+                    onDoubleClicked: { matchList.currentIndex = index; identifyDialog.accept() }
+                }
+                Label {
+                    anchors.centerIn: parent
+                    visible: matchList.count === 0
+                    text: qsTr("No matching compounds")
+                    color: Theme.placeholderTextColor
+                }
+            }
+            RadioButton { id: newRadio; text: qsTr("New compound") }
+            GridLayout {
+                enabled: newRadio.checked
+                columns: 2
+                columnSpacing: 10
+                Label { text: qsTr("Name") }
+                TextField { id: newName; Layout.fillWidth: true }
+                Label { text: qsTr("InChIKey") }
+                TextField { id: newInchikey; Layout.fillWidth: true; font.family: "monospace" }
+                Label { text: qsTr("Formula") }
+                TextField { id: newFormula; Layout.fillWidth: true; placeholderText: qsTr("optional") }
+                Label { text: qsTr("SMILES") }
+                TextField { id: newSmiles; Layout.fillWidth: true; placeholderText: qsTr("optional") }
+            }
         }
     }
 }

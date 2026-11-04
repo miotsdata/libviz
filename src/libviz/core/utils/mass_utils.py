@@ -67,3 +67,9 @@ def adduct_mz(neutral_mass: float, adduct: str) -> float:
     masses, so the ion's missing/extra electrons are corrected here."""
     charge, delta, multiplier = infer_precursor_delta(adduct)
     return (multiplier * neutral_mass + delta - charge * ELECTRON) / abs(charge)
+
+
+def neutral_mass(mz: float, adduct: str) -> float:
+    """Inverse of :func:`adduct_mz`: the neutral mass whose ``adduct`` ion has m/z ``mz``."""
+    charge, delta, multiplier = infer_precursor_delta(adduct)
+    return (mz * abs(charge) - delta + charge * ELECTRON) / multiplier

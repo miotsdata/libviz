@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from mzml_factory import write_mzml  # noqa: E402
 
-from libviz.core.builder import (BuildParams, TargetListError, commit, conflicts, find_candidates,
+from libviz.core.builder import (BuildParams, TargetListError, commit, conflicts, find_candidates, identify, manual_target,
                                  parse_targets, process_peaks)
 from libviz.core.library import Library
 from libviz.core.readers.mzml_reader import iter_ms2
@@ -184,3 +184,27 @@ def test_commit_only_chosen_groups(tmp_path, targets):
             g.chosen = None
     lib = Library.create(tmp_path / "lib.db", name="built")
     assert commit(lib, result)["added"] == 1
+
+
+def test_manual_target_explore_then_identify_into_existing_compound(tmp_path, targets):
+    by_mz = manual_target("195,087652", "[M+H]+")
+    assert by_mz.query == "m/z 195.0877 [M+H]+" and not by_mz.identified
+    assert by_mz.exact_mass == pytest.approx(targets[0].exact_mass, abs=1e-5)
+    assert manual_target("C8H10N4O2", "[M+H]+").exact_mass == pytest.approx(targets[0].exact_mass)
+    for bad in (("xyz", "[M+H]+"), ("195.08", "[M+Foo]+"), ("-1", "[M+H]+")):
+        with pytest.raises(TargetListError):
+            manual_target(*bad)
+
+    path = write_mzml(tmp_path / "c.mzML", [scan(CAFFEINE_MH)])
+    result = find_candidates([by_mz], [path])
+    assert result.n_chosen == 1
+    lib = Library.create(tmp_path / "lib.db", name="built")
+    with pytest.raises(ValueError, match="identify"):
+        commit(lib, result)
+
+    commit(lib, find_candidates(targets[:1], [path]))  # Caffeine already in the library
+    with pytest.raises(TargetListError):
+        identify(by_mz, "Caffeine", "not-a-key")
+    identify(by_mz, "Caffeine", "RYYVLZVUVIJVGH-UHFFFAOYSA-N")
+    assert commit(lib, result, on_conflict="replace") == {"added": 0, "replaced": 1, "skipped": 0}
+    assert lib.n_compounds == 1

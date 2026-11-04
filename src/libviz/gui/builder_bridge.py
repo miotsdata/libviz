@@ -59,6 +59,7 @@ class BuilderBridge(QObject):
     resultChanged = Signal()  # rows / summary / stage
     selectionChanged = Signal()  # selected group, candidates, preview
     conflictCountChanged = Signal()
+    compoundMatchesChanged = Signal()
     errorOccurred = Signal(str)
     committed = Signal(str, str)  # library key, summary message
 
@@ -76,6 +77,8 @@ class BuilderBridge(QObject):
         self._selected = -1
         self._preview = -1
         self._conflicts = -1
+        self._compound_matches: list[dict] = []
+        self._match_request = 0  # only the newest search (typing) is shown
         self._rows = DictListModel(["index", "target", "formula", "adduct", "polarity", "mz", "ce", "n",
                                     "chosen", "status", "ppm", "rt", "file"], self)
 
@@ -93,6 +96,22 @@ class BuilderBridge(QObject):
             self._targets, self._targets_path, self._targets_error = [], path, message
             self.targetsChanged.emit()
         start_task(self, builder.parse_targets, path, on_success=loaded, on_error=failed)
+
+    @Slot(str, str)
+    def addManualTarget(self, formula_or_mz: str, adduct: str):
+        """Explore by hand: an m/z or a formula with one adduct, no identity yet."""
+        try:
+            self._targets.append(builder.manual_target(formula_or_mz, adduct))
+        except builder.TargetListError as e:
+            self.errorOccurred.emit(str(e))
+            return
+        self.targetsChanged.emit()
+
+    @Slot(int)
+    def removeTarget(self, index: int):
+        if 0 <= index < len(self._targets):
+            del self._targets[index]
+            self.targetsChanged.emit()
 
     @Property(str, notify=targetsChanged)
     def targetsPath(self) -> str:
@@ -190,7 +209,7 @@ class BuilderBridge(QObject):
         if self.running:
             return
         if not self._targets:
-            self.errorOccurred.emit("Load a target list first.")
+            self.errorOccurred.emit("Load a target list or add a target by hand first.")
             return
         if not self._files:
             self.errorOccurred.emit("Add at least one mzML file.")
@@ -346,6 +365,48 @@ class BuilderBridge(QObject):
             self._conflicts = len(indices)
             self.conflictCountChanged.emit()
         start_task(self, builder.conflicts, lib, self._result, on_success=counted, on_error=self.errorOccurred)
+
+    @Property(list, notify=resultChanged)
+    def manualTargets(self) -> list:
+        """Hand-entered targets with a chosen spectrum: identified at commit."""
+        r = self._result
+        if r is None:
+            return []
+        chosen = {g.target_index for g in r.groups if g.chosen is not None}
+        return [{"index": i, "query": t.query, "identified": t.identified, "name": t.name, "inchikey": t.inchikey,
+                 "formula": t.formula}
+                for i, t in enumerate(r.targets) if t.query and i in chosen]
+
+    @Property(list, notify=compoundMatchesChanged)
+    def compoundMatches(self) -> list:
+        return self._compound_matches
+
+    @Slot(str, int, str)
+    def findCompounds(self, key: str, target_index: int, text: str):
+        """Compounds of library ``key`` to add a hand-entered target to:
+        by ``text``, or by the target's mass when ``text`` is empty."""
+        lib = self._libraries.manager.library(key)
+        if lib is None or self._result is None:
+            return
+        mass = self._result.targets[target_index].exact_mass
+        filters = {"text": text} if text.strip() else {"mass": mass, "ppm": self._params.ppm}
+        self._match_request += 1
+        request = self._match_request
+
+        def found(rows):
+            if request == self._match_request:
+                self._compound_matches = rows
+                self.compoundMatchesChanged.emit()
+        start_task(self, lib.search_compounds, limit=100, **filters, on_success=found, on_error=self.errorOccurred)
+
+    @Slot(int, str, str, str, str)
+    def identify(self, target_index: int, name: str, inchikey: str, formula: str, smiles: str):
+        try:
+            builder.identify(self._result.targets[target_index], name, inchikey, formula, smiles)
+        except builder.TargetListError as e:
+            self.errorOccurred.emit(str(e))
+            return
+        self._changed()
 
     @Slot(str, bool)
     def commit(self, key: str, replace_existing: bool):

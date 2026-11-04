@@ -108,3 +108,33 @@ def test_run_requires_files(qtbot, setup):
     with qtbot.waitSignal(b.errorOccurred, timeout=1000) as blocker:
         b.run()
     assert "mzML" in blocker.args[0]
+
+
+def test_hand_entered_target_is_identified_as_existing_compound(qtbot, setup, tmp_path):
+    libraries, b = setup
+    b.removeTarget(0)
+    with qtbot.waitSignal(b.errorOccurred, timeout=1000):
+        b.addManualTarget("nope", "[M+H]+")
+    b.addManualTarget(f"{MH}", "[M+H]+")
+    assert b.targetCount == 1 and b.targetsPreview[0]["name"] == "m/z 195.0877 [M+H]+"
+    run(qtbot, b)
+    [manual] = b.manualTargets
+    assert not manual["identified"]
+
+    lib = Library.create(tmp_path / "lib.db", name="Std")
+    lib.add_spectra("Caffeine", "C8H10N4O2", "RYYVLZVUVIJVGH-UHFFFAOYSA-N",
+                    {"precursor_mz": MH, "polarity": "POSITIVE", "collision_energy": 99.0,
+                     "mz": [1.0], "intensity": [1.0]}, lib.get_adducts()[0]["id"])
+    with qtbot.waitSignal(libraries.libraryOpened, timeout=5000):
+        libraries.openLibrary(str(tmp_path / "lib.db"))
+    key = libraries.selectedKey
+    with qtbot.waitSignal(b.compoundMatchesChanged, timeout=5000):
+        b.findCompounds(key, manual["index"], "")  # by mass
+    [match] = b.compoundMatches
+    b.identify(manual["index"], match["name"], match["inchikey"], match["formula"], "")
+    assert b.manualTargets[0]["identified"] and b.manualTargets[0]["name"] == "Caffeine"
+
+    with qtbot.waitSignal(b.committed, timeout=10_000):
+        b.commit(key, False)
+    [compound] = Library.load_from_db(tmp_path / "lib.db").search_compounds()
+    assert compound["n_spectra"] == 3  # existing + CE 20 + CE 40 (DIA), all on the one compound

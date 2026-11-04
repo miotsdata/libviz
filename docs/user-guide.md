@@ -40,6 +40,8 @@ discarding it.
     open and follows the selected spectrum.
   - Compound identifiers (InChIKey, SMILES, PubChem link) and every metadata
     field stored with the spectrum.
+- Each open library keeps its own filters and selected compound/spectrum:
+  switching to another library and back restores them.
 
 ## Overview and quality checks
 
@@ -109,6 +111,11 @@ Changes are written to the library immediately and can't be undone. Use
 
    Every problem in the file (bad formula, malformed InChIKey, unknown
    adduct, duplicate compound) is listed at once.
+
+   **Or by hand**, without a target list: type a precursor m/z or a formula,
+   an adduct, and click *Add* (repeat for more; ✕ removes one). These targets
+   have no identity while you explore. You choose the compound when you add
+   them to a library (step 5).
 2. **mzML files:** centroided MS2 (convert with msconvert,
    `peakPicking true 1-`). DDA, DIA and imaging runs all work.
 3. **Parameters:**
@@ -128,6 +135,10 @@ Changes are written to the library immediately and can't be undone. Use
      review those, or *Reject multiplexed*.
 5. **Add to library:**
    - Pick an open library or create a new one.
+   - Hand-entered targets: *Identify…* each one, as an existing compound of
+     that library (listed by matching mass, or search by name/formula/InChIKey)
+     or as a new compound (name, InChIKey, optional formula/SMILES). *OK* is
+     enabled once all of them are identified.
    - If the library already has a spectrum for the same compound, adduct,
      polarity and CE, choose whether to keep it or replace it.
    - Provenance (file, scan, RT, observed m/z and ppm error) is saved in the

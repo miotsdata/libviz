@@ -21,12 +21,16 @@ def peaks_as_text(spectrum: dict) -> str:
     return "\n".join(f"{mz:.4f}\t{i:g}" for mz, i in zip(spectrum.get("mz", []), spectrum.get("intensity", [])))
 
 
+VIEW_FIELDS = ("text", "mass", "ppm", "polarity", "adduct", "collision_energy")
+
+
 class InspectorBridge(QObject):
     """Browse the selected library: filtered compound table → spectra of the
     selected compound → one spectrum (peaks + metadata). All reads run on
     workers; a late answer for something no longer selected is dropped."""
 
     filterOptionsChanged = Signal()
+    viewChanged = Signal()
     overviewChanged = Signal()
     comparisonChanged = Signal()
     issueChanged = Signal()
@@ -48,6 +52,10 @@ class InspectorBridge(QObject):
         self._overview: dict = {}
         self._comparison: dict = {}
         self._issue = ""
+        # What the filter bar shows (raw strings), and per library key the
+        # filters + selection to restore when switching back to it.
+        self._view: dict = dict.fromkeys(VIEW_FIELDS, "")
+        self._views: dict[str, dict] = {}
         # Only the newest compound/spectrum request is applied (fast clicking).
         self._compound_request = 0
         self._spectrum_request = 0
@@ -67,11 +75,23 @@ class InspectorBridge(QObject):
         key = self._libraries.selectedKey
         if key == self._key:
             return
+        if self._key:
+            self._views[self._key] = {**self._view, "issue": self._issue,
+                                      "compound": self._compound.get("id"), "spectrum": self._spectrum.get("id")}
+        open_keys = self._libraries.manager.libraries
+        self._views = {k: v for k, v in self._views.items() if k in open_keys}  # forget closed libraries
         self._key = key
-        self._issue = ""
+        saved = self._views.get(key, {})
+        self._view = {k: saved.get(k, "") for k in VIEW_FIELDS}
+        self._issue = saved.get("issue", "")
         self.issueChanged.emit()
+        self.viewChanged.emit()
         self._model.set_library(self._lib)
         self._clear_selection()
+        if any(self._view.values()) or self._issue:
+            self._apply_filters()
+        if saved.get("compound") is not None:
+            self._load_compound(saved["compound"], spectrum_id=saved.get("spectrum"))
         self._load_filter_options()
         self._overview = {}
         self.overviewChanged.emit()
@@ -84,7 +104,7 @@ class InspectorBridge(QObject):
         if self._overview:
             self.loadOverview()
         if self._compound:
-            self._load_compound(self._compound["id"], keep_spectrum=True)
+            self._load_compound(self._compound["id"], spectrum_id=self._spectrum.get("id"))
 
     def _clear_selection(self):
         self._compound, self._spectra, self._spectrum, self._comparison = {}, [], {}, {}
@@ -104,7 +124,7 @@ class InspectorBridge(QObject):
                 self.filterOptionsChanged.emit()
         start_task(self, lib.filter_options, on_success=loaded, on_error=self._error_for(key))
 
-    def _load_compound(self, compound_id: int, keep_spectrum: bool = False):
+    def _load_compound(self, compound_id: int, spectrum_id: int | None = None):
         lib, key = self._lib, self._key
         if lib is None:
             return
@@ -122,8 +142,8 @@ class InspectorBridge(QObject):
             self.compoundChanged.emit()
             self.spectraChanged.emit()
             ids = [s["id"] for s in self._spectra]
-            if keep_spectrum and self._spectrum.get("id") in ids:
-                self.selectSpectrum(self._spectrum["id"])
+            if spectrum_id in ids:
+                self.selectSpectrum(spectrum_id)
             elif ids:
                 self.selectSpectrum(ids[0])
             else:
@@ -153,16 +173,27 @@ class InspectorBridge(QObject):
     def spectrum(self) -> dict:
         return self._spectrum
 
+    @Property("QVariantMap", notify=viewChanged)
+    def view(self) -> dict:
+        """The filter bar's raw values for the shown library (restored on switch)."""
+        return self._view
+
     @Slot(str, str, str, str, str, str)
     def setFilters(self, text: str, mass: str, ppm: str, polarity: str, adduct: str, collision_energy: str):
         """Empty strings mean "any". ``mass`` is a neutral mass or m/z."""
+        self._view = {"text": text, "mass": mass, "ppm": ppm, "polarity": polarity, "adduct": adduct,
+                      "collision_energy": collision_energy}
+        self._apply_filters()
+
+    def _apply_filters(self):
+        v = self._view
         self._model.set_filters({
-            "text": text,
-            "mass": parse_float(mass),
-            "ppm": parse_float(ppm) or 10.0,
-            "polarity": polarity or None,
-            "adduct": adduct or None,
-            "collision_energy": parse_float(collision_energy),
+            "text": v["text"],
+            "mass": parse_float(v["mass"]),
+            "ppm": parse_float(v["ppm"]) or 10.0,
+            "polarity": v["polarity"] or None,
+            "adduct": v["adduct"] or None,
+            "collision_energy": parse_float(v["collision_energy"]),
             "issue": self._issue or None,
         })
 
@@ -198,7 +229,7 @@ class InspectorBridge(QObject):
         """Restrict the table to compounds with a QC issue ("" = none)."""
         self._issue = issue
         self.issueChanged.emit()
-        self._model.set_filters({**self._model._filters, "issue": issue or None})  # pylint: disable=protected-access
+        self._apply_filters()
 
     # --- compare --------------------------------------------------------------
 

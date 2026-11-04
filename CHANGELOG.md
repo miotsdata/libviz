@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- mzML builder: explore without a target list by typing an m/z or formula and an adduct. Each hand-entered target is identified when added to a library, as an existing compound of that library or a new one.
+
+### Changed
+- Each open library keeps its own filters and selected compound/spectrum when switching between libraries.
+
 ## 0.2.1 — 2026-10-28
 
 ### Added

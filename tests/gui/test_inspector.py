@@ -182,3 +182,23 @@ def test_only_newest_selection_is_applied(qtbot, bridges, tmp_path):
     qtbot.waitUntil(lambda: inspector.compound.get("name") == "cmp002" and inspector.spectrum.get("mz") == [52.0])
     qtbot.wait(100)
     assert inspector.compound["name"] == "cmp002"
+
+
+def test_switching_libraries_keeps_each_ones_filters_and_selection(qtbot, bridges, tmp_path):
+    libraries, inspector = bridges
+    make_library(tmp_path / "other.db", n=2)
+    _open_and_select(qtbot, libraries, inspector, tmp_path / "lib.db", row=1)
+    first, spectrum_id = libraries.selectedKey, inspector.spectrum["id"]
+    with qtbot.waitSignal(inspector.compounds.countChanged, timeout=5000):
+        inspector.setFilters("cmp001", "", "5", "POSITIVE", "", "")
+
+    with qtbot.waitSignal(inspector.filterOptionsChanged, timeout=5000):
+        libraries.openLibrary(str(tmp_path / "other.db"))
+    assert inspector.view["text"] == "" and inspector.compound == {}
+    qtbot.waitUntil(lambda: inspector.compounds.rowCount() == 2)
+
+    libraries.selectLibrary(first)
+    assert inspector.view["text"] == "cmp001" and inspector.view["ppm"] == "5"
+    qtbot.waitUntil(lambda: inspector.spectrum.get("id") == spectrum_id)
+    assert inspector.compound["name"] == "cmp001"
+    qtbot.waitUntil(lambda: inspector.compounds.rowCount() == 1)

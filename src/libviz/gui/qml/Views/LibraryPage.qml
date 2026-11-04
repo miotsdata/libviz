@@ -21,15 +21,24 @@ Item {
         polarityBox.currentIndex = 0; adductBox.currentIndex = 0; ceBox.currentIndex = 0
         applyFilters()
     }
-    // A different library: its filters start empty (the model already cleared them).
+    // Show the filters Inspector keeps for this library (empty for a new one,
+    // the previous ones when switching back, or when this page is reloaded).
+    function showView() {
+        var v = Inspector.view
+        searchField.text = v.text || ""; massField.text = v.mass || ""; ppmField.text = v.ppm || "10"
+        showCombos()
+    }
+    // The combo lists load asynchronously: re-pick the values once they are there.
+    function showCombos() {
+        var v = Inspector.view
+        function pick(box, value) { box.currentIndex = value ? Math.max(0, box.find(value)) : 0 }
+        pick(polarityBox, v.polarity); pick(adductBox, v.adduct); pick(ceBox, v.collision_energy)
+    }
+    Component.onCompleted: showView()
     Connections {
-        target: Libraries
-        function onSelectedChanged() {
-            searchField.text = ""; massField.text = ""
-            polarityBox.currentIndex = 0; adductBox.currentIndex = 0; ceBox.currentIndex = 0
-            debounce.stop()
-            tabs.currentIndex = 0
-        }
+        target: Inspector
+        function onViewChanged() { debounce.stop(); tabs.currentIndex = 0; page.showView() }
+        function onFilterOptionsChanged() { Qt.callLater(page.showCombos) }
     }
     Timer { id: debounce; interval: 300; onTriggered: page.applyFilters() }
 
