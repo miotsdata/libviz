@@ -48,7 +48,8 @@ a = Analysis(
         (str(PKG / "alembic.ini"), "."),
     ],
     # Imported only by the migration scripts, which Alembic loads from files.
-    hiddenimports=["alembic.op", "alembic.context", "logging.config"],
+    hiddenimports=["alembic.op", "alembic.context", "logging.config",
+                   "openpyxl"],  # pandas imports it by name for read_excel (ADR 10)
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

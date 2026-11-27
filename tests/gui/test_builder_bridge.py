@@ -190,3 +190,27 @@ def test_rt_is_the_chosen_scans_or_set_by_hand(qtbot, setup, tmp_path):
     assert {s["collision_energy"]: s["rt"] for s in spectra} == {20.0: pytest.approx(2.1), 40.0: None}
     b.resetRt(by_ce["20"])
     assert b.rowRt["text"] == "2.000"
+
+
+def test_targets_from_library(qtbot, setup, tmp_path):
+    """Compounds imported without spectra (any key) are searched and get their spectra (ADR 10)."""
+    libraries, b = setup
+    b.removeTarget(0)
+    lib = Library.create(tmp_path / "lib.db", name="Std")
+    with lib.session_scope() as session:
+        from libviz.core.db.models import Compound
+        session.add(Compound(name="Caffeine", formula="C8H10N4O2", inchikey="CAFF-NO-KEY", exact_mass=194.0804))
+    with qtbot.waitSignal(libraries.libraryOpened, timeout=5000):
+        libraries.openLibrary(str(tmp_path / "lib.db"))
+    key = libraries.selectedKey
+    with qtbot.waitSignal(b.libraryCompoundsChanged, timeout=5000):
+        b.searchLibraryCompounds(key, "")
+    b.addLibraryTargets(b.libraryCompounds)
+    b.addLibraryTargets(b.libraryCompounds)  # already a target: not added twice
+    assert b.targetCount == 1 and b.targetsPreview[0]["name"] == "Caffeine"
+
+    run(qtbot, b)
+    with qtbot.waitSignal(b.committed, timeout=10_000):
+        b.commit(key, False)
+    [compound] = Library.load_from_db(tmp_path / "lib.db").search_compounds()
+    assert compound["inchikey"] == "CAFF-NO-KEY" and compound["n_spectra"] == 2

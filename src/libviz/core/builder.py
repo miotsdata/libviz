@@ -87,11 +87,15 @@ def manual_target(formula_or_mz: str, adduct: str) -> Target:
 def identify(target: Target, name: str, inchikey: str, formula: str = "", smiles: str | None = None):
     """Give a hand-entered target the compound it is added as (new, or an
     existing one of the library: commit matches compounds by InChIKey)."""
-    name, inchikey, formula = name.strip(), inchikey.strip().upper(), formula.strip()
+    name, inchikey, formula = name.strip(), inchikey.strip(), formula.strip()
+    if INCHIKEY_RE.match(inchikey.upper()):
+        inchikey = inchikey.upper()
     if not name:
         raise TargetListError("the compound needs a name")
-    if not _INCHIKEY_RE.match(inchikey):
-        raise TargetListError(f"invalid InChIKey {inchikey!r}")
+    # Any key is accepted (library compounds may have none, ADR 10); the
+    # overview lists invalid ones.
+    if not inchikey:
+        raise TargetListError("the compound needs an InChIKey (or another unique key)")
     if formula:
         exact_mass = calculate_exact_mass(formula, 6)
         if exact_mass is None:
@@ -112,7 +116,7 @@ _COLUMN_ALIASES = {
     "rt_max": ("rt_max", "rt_end", "rtmax"),
     "rt": ("rt",),
 }
-_INCHIKEY_RE = re.compile(r"^[A-Z]{14}-[A-Z]{10}-[A-Z]$")
+INCHIKEY_RE = re.compile(r"^[A-Z]{14}-[A-Z]{10}-[A-Z]$")
 
 
 def _optional_float(value: str, what: str, line: int) -> float | None:
@@ -159,7 +163,7 @@ def parse_targets(path: Path | str, *, rt_tolerance: float = 0.5) -> list[Target
             exact_mass = calculate_exact_mass(formula, 6)
             if exact_mass is None:
                 raise TargetListError(f"line {line}: invalid formula {formula!r}")
-            if not _INCHIKEY_RE.match(inchikey):
+            if not INCHIKEY_RE.match(inchikey):
                 raise TargetListError(f"line {line}: invalid InChIKey {inchikey!r}")
             if inchikey in seen:
                 raise TargetListError(f"line {line}: InChIKey {inchikey} already on line {seen[inchikey]}")

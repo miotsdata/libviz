@@ -120,6 +120,19 @@ Item {
                         ToolTip.text: qsTr("Explore without a target list; the compound is chosen when adding to a library")
                     }
                 }
+                RowLayout {
+                    Layout.leftMargin: 10
+                    Layout.rightMargin: 10
+                    Label { text: qsTr("or from a library:"); color: Theme.mutedTextColor }
+                    Button {
+                        text: qsTr("Choose compounds…")
+                        enabled: Libraries.libraries.length > 0
+                        onClicked: libraryTargetsDialog.openDialog()
+                        ToolTip.visible: hovered
+                        ToolTip.delay: 600
+                        ToolTip.text: qsTr("Search spectra for compounds already in an open library (e.g. imported from Excel)")
+                    }
+                }
                 Label {
                     visible: Builder.targetCount > 0
                     Layout.leftMargin: 10
@@ -607,6 +620,99 @@ Item {
                 Layout.maximumWidth: 420
             }
             CheckBox { id: replaceBox; visible: Builder.conflictCount > 0; text: qsTr("Replace the existing spectra (otherwise keep them)") }
+        }
+    }
+
+    // Compounds of an open library as targets (ADR 10): checklist, default adducts.
+    Dialog {
+        id: libraryTargetsDialog
+        objectName: "libraryTargetsDialog"
+        title: qsTr("Targets from a library")
+        anchors.centerIn: parent
+        modal: true
+        property var choices: Libraries.libraries
+        property var checkedRows: ({})  // compound id -> row, kept across filter changes
+        property int checkedCount: 0
+        readonly property string key: sourceBox.currentIndex >= 0 && sourceBox.currentIndex < choices.length
+                                      ? choices[sourceBox.currentIndex].key : ""
+        function openDialog() {
+            var i = choices.findIndex(function (l) { return l.key === Libraries.selectedKey })
+            sourceBox.currentIndex = i >= 0 ? i : (choices.length ? 0 : -1)
+            reset()
+            open()
+        }
+        function reset() {
+            checkedRows = ({}); checkedCount = 0; filterField.text = ""
+            if (key) Builder.searchLibraryCompounds(key, "")
+        }
+        function setChecked(row, on) {
+            var rows = checkedRows
+            if (on) rows[row.id] = row; else delete rows[row.id]
+            checkedRows = rows
+            checkedCount = Object.keys(rows).length
+        }
+        footer: DialogButtonBox {
+            Button {
+                text: qsTr("Add %1 targets").arg(libraryTargetsDialog.checkedCount)
+                enabled: libraryTargetsDialog.checkedCount > 0
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button { text: qsTr("Cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+        }
+        onAccepted: Builder.addLibraryTargets(Object.keys(checkedRows).map(function (id) { return checkedRows[id] }))
+        ColumnLayout {
+            spacing: 6
+            RowLayout {
+                Label { text: qsTr("Library") }
+                ComboBox {
+                    id: sourceBox
+                    Layout.fillWidth: true
+                    model: libraryTargetsDialog.choices.map(function (l) { return l.name })
+                    onActivated: libraryTargetsDialog.reset()
+                }
+            }
+            RowLayout {
+                TextField {
+                    id: filterField
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Filter: name, formula or InChIKey")
+                    onTextEdited: Builder.searchLibraryCompounds(libraryTargetsDialog.key, text)
+                }
+                Button {
+                    text: qsTr("All")
+                    onClicked: Builder.libraryCompounds.forEach(function (row) { libraryTargetsDialog.setChecked(row, true) })
+                }
+                Button {
+                    text: qsTr("None")
+                    onClicked: Builder.libraryCompounds.forEach(function (row) { libraryTargetsDialog.setChecked(row, false) })
+                }
+            }
+            ListView {
+                id: libraryCompoundList
+                Layout.preferredWidth: 560
+                Layout.preferredHeight: 320
+                clip: true
+                model: Builder.libraryCompounds
+                ScrollBar.vertical: ScrollBar {}
+                delegate: CheckDelegate {
+                    required property var modelData
+                    width: ListView.view.width
+                    text: modelData.name + "  ·  " + modelData.formula + "  ·  " + modelData.n_spectra + qsTr(" spectra")
+                    checked: libraryTargetsDialog.checkedRows[modelData.id] !== undefined
+                    onToggled: libraryTargetsDialog.setChecked(modelData, checked)
+                }
+                Label {
+                    anchors.centerIn: parent
+                    visible: libraryCompoundList.count === 0
+                    text: qsTr("No matching compounds")
+                    color: Theme.placeholderTextColor
+                }
+            }
+            Label {
+                text: qsTr("Each compound is searched with the default adducts (parameters on the right).")
+                color: Theme.mutedTextColor
+                font.pixelSize: Theme.captionPixelSize
+            }
         }
     }
 

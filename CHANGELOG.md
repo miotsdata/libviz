@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- *Library › Import compounds (Excel/CSV)…*: add compounds without spectra from an `.xlsx` sheet or a CSV/TSV, with a column mapping, a preview and per-row warnings (ADR 10). A missing or invalid InChIKey is accepted with a warning; a mass that differs from the formula by more than 0.01 Da is flagged.
+- Quality check *compounds with an invalid or missing InChIKey*, with *Show*.
+- mzML builder: *Choose compounds…* takes targets from an open library's compounds (checklist), so imported compounds get their spectra.
+- Formulas with `D` (deuterium) are accepted everywhere, and spaces or invisible characters in them are ignored.
+
+### Changed
+- Identifying a hand-entered target accepts any non-empty key, as imported compounds may have no InChIKey.
+- MSP export leaves out `INCHIKEY` when the key isn't a valid InChIKey.
+
 ## 0.3.0 — 2026-11-04
 
 ### Fixed

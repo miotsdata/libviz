@@ -94,7 +94,8 @@ def test_overview(lib):
     assert dict(map(tuple, o["adduct"]))["[M+H]+"] == 2
     assert dict(map(tuple, o["peaks"])) == {"1–2": 4}
     issues = {i["key"]: i["count"] for i in o["issues"]}
-    assert issues == {"no_spectra": 0, "no_smiles": 3, "few_peaks": 3, "no_polarity": 0, "duplicates": 0}
+    assert issues == {"no_spectra": 0, "no_smiles": 3, "few_peaks": 3, "no_polarity": 0, "duplicates": 0,
+                      "bad_inchikey": 0}
 
 
 def test_issue_filter(lib):

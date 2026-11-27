@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from pathlib import Path
-from sqlalchemy import Engine, create_engine, event, exists, func, or_, select
+from sqlalchemy import Engine, create_engine, event, exists, func, not_, or_, select
 from sqlalchemy.orm import sessionmaker
 import numpy as np
 import logging
@@ -425,7 +425,10 @@ class Library:
         "few_peaks": "compounds with a spectrum of ≤ 2 peaks",
         "no_polarity": "compounds with a spectrum without polarity",
         "duplicates": "compounds with identical (duplicate) spectra",
+        "bad_inchikey": "compounds with an invalid or missing InChIKey",
     }
+    # SQLite GLOB is case-sensitive: 14 letters, 10 letters, 1 letter (ADR 10).
+    INCHIKEY_GLOB = "[A-Z]" * 14 + "-" + "[A-Z]" * 10 + "-[A-Z]"
 
     def _issue_condition(self, issue: str):
         if issue == "no_spectra":
@@ -440,6 +443,8 @@ class Library:
             dup = (select(Spectrum.compound_id).group_by(Spectrum.compound_id, Spectrum.spectrum_hash)
                    .having(func.count(Spectrum.id) > 1))
             return Compound.id.in_(dup)
+        if issue == "bad_inchikey":
+            return not_(Compound.inchikey.op("GLOB", is_comparison=True)(self.INCHIKEY_GLOB))
         raise ValueError(f"unknown issue {issue!r}; one of {sorted(self.ISSUES)}")
 
     def _compound_filters(self, text: str = "", mass: float | None = None, ppm: float = 10.0,

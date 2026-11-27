@@ -46,8 +46,19 @@ def test_every_page_loads_without_warnings(qtbot, msp_file):
     qtbot.waitUntil(lambda: bridges["Inspector"].compounds.rowCount() > 0)
     with qtbot.waitSignal(bridges["Inspector"].spectrumChanged, timeout=10_000):
         bridges["Inspector"].selectCompoundRow(0)
-    window.setProperty("page", "builder")  # builder page
+    compound_table = msp_file.with_name("compounds.csv")  # import-compounds dialog, filled
+    compound_table.write_text("Nome,formula,Mass,InChIKey\nCA,C24H40O5,408.29,\nBad,,,\n")
+    with qtbot.waitSignal(bridges["CompoundImport"].tableChanged, timeout=5000):
+        bridges["CompoundImport"].load(str(compound_table))
+    window.findChild(QObject, "importCompoundsDialog").open()
     qtbot.wait(100)
+    window.findChild(QObject, "importCompoundsDialog").close()
+    window.setProperty("page", "builder")  # builder page + its library checklist
+    qtbot.wait(100)
+    with qtbot.waitSignal(bridges["Builder"].libraryCompoundsChanged, timeout=5000):
+        window.findChild(QObject, "libraryTargetsDialog").openDialog()
+    qtbot.wait(100)
+    window.findChild(QObject, "libraryTargetsDialog").close()
     window.setProperty("page", "search")  # search page
     qtbot.wait(100)
     window.setProperty("page", "")

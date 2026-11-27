@@ -204,7 +204,7 @@ def test_manual_target_explore_then_identify_into_existing_compound(tmp_path, ta
 
     commit(lib, find_candidates(targets[:1], [path]))  # Caffeine already in the library
     with pytest.raises(TargetListError):
-        identify(by_mz, "Caffeine", "not-a-key")
+        identify(by_mz, "Caffeine", "  ")  # any key is accepted (ADR 10), but not none
     identify(by_mz, "Caffeine", "RYYVLZVUVIJVGH-UHFFFAOYSA-N")
     assert commit(lib, result, on_conflict="replace") == {"added": 0, "replaced": 1, "skipped": 0}
     assert lib.n_compounds == 1

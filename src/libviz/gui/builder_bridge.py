@@ -12,6 +12,7 @@ from libviz.gui.dict_model import DictListModel
 from libviz.gui.library_bridge import LibraryBridge, to_local_path
 from libviz.gui.worker import start_task
 
+LIBRARY_TARGET_LIMIT = 2000  # compounds listed in "From library…" (filter to narrow)
 # QML param name -> (BuildParams field, from-QML conversion, to-QML conversion)
 _PARAMS = {
     "ppm": ("ppm", float, float),
@@ -62,6 +63,7 @@ class BuilderBridge(QObject):
     selectionChanged = Signal()  # selected group, candidates, preview
     conflictCountChanged = Signal()
     compoundMatchesChanged = Signal()
+    libraryCompoundsChanged = Signal()
     errorOccurred = Signal(str)
     committed = Signal(str, str)  # library key, summary message
 
@@ -81,6 +83,8 @@ class BuilderBridge(QObject):
         self._conflicts = -1
         self._compound_matches: list[dict] = []
         self._match_request = 0  # only the newest search (typing) is shown
+        self._library_compounds: list[dict] = []
+        self._library_request = 0
         # (m/z, polarity) -> [(file name, rt array, intensity array)], per run.
         self._eics: dict[tuple, list] = {}
         self._rows = DictListModel(["index", "target", "formula", "adduct", "polarity", "mz", "ce", "n",
@@ -109,6 +113,40 @@ class BuilderBridge(QObject):
         except builder.TargetListError as e:
             self.errorOccurred.emit(str(e))
             return
+        self.targetsChanged.emit()
+
+    @Property(list, notify=libraryCompoundsChanged)
+    def libraryCompounds(self) -> list:
+        return self._library_compounds
+
+    @Slot(str, str)
+    def searchLibraryCompounds(self, key: str, text: str):
+        """Compounds of library ``key`` to pick as targets (ADR 10), by name,
+        InChIKey prefix or formula; all of them (up to the limit) when empty."""
+        lib = self._libraries.manager.library(key)
+        if lib is None:
+            return
+        self._library_request += 1
+        request = self._library_request
+
+        def found(rows):
+            if request == self._library_request:
+                self._library_compounds = rows
+                self.libraryCompoundsChanged.emit()
+        start_task(self, lib.search_compounds, text=text, limit=LIBRARY_TARGET_LIMIT,
+                   on_success=found, on_error=self.errorOccurred)
+
+    @Slot(list)
+    def addLibraryTargets(self, compounds: list):
+        """Library compounds (rows of ``libraryCompounds``) become identified
+        targets with the default adducts; commit finds them again by key."""
+        known_keys = {t.inchikey for t in self._targets if t.inchikey}
+        for compound in compounds:
+            if compound["inchikey"] in known_keys or compound.get("exact_mass") is None:
+                continue
+            self._targets.append(builder.Target(name=compound["name"], formula=compound["formula"],
+                                                inchikey=compound["inchikey"], exact_mass=compound["exact_mass"]))
+            known_keys.add(compound["inchikey"])
         self.targetsChanged.emit()
 
     @Slot(int)

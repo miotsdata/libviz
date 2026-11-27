@@ -41,7 +41,19 @@ def infer_precursor_delta(name: str) -> tuple[int, float]:
     return charge, delta, multiplication_factor
 
 
+_INVISIBLE_RE = re.compile(r"[\s​-‍⁠﻿]+")
+_DEUTERIUM_RE = re.compile(r"D(?![a-z])")  # D, D4 — not Dy, Db, Ds
+
+
+def clean_formula(formula: str) -> str:
+    """Drop whitespace and zero-width characters (pasted from Excel/web)."""
+    return _INVISIBLE_RE.sub("", formula or "")
+
+
 def calculate_exact_mass(formula: str, n_decimals: int = 4) -> float | None:
+    """Monoisotopic mass of ``formula``, or None if it can't be parsed.
+    ``D`` is deuterium (pyteomics only knows it as ``H[2]``)."""
+    formula = _DEUTERIUM_RE.sub("H[2]", clean_formula(formula))
     if not formula:
         return None
     try:

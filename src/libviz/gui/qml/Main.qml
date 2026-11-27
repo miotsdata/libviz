@@ -79,6 +79,11 @@ ApplicationWindow {
         }
         Libraries.openLibrary(path)
     }
+    function showInfo(message, details) {
+        infoDialog.text = message
+        infoDialog.detailedText = details || ""  // "Show Details…" only when set
+        infoDialog.open()
+    }
     function showError(message) {
         errorDialog.text = message
         errorDialog.open()
@@ -121,6 +126,7 @@ ApplicationWindow {
             Action { text: qsTr("&Spectral search…"); shortcut: "Ctrl+F"; onTriggered: window.page = "search" }
             MenuSeparator {}
             Action { text: qsTr("&Rename…"); enabled: window.hasSelection && !Libraries.busy; onTriggered: renameDialog.openWith(Libraries.selected.name) }
+            Action { text: qsTr("Import &compounds (Excel/CSV)…"); enabled: window.hasSelection && !Libraries.busy; onTriggered: importCompoundsDialog.openForSelected() }
             Action { text: qsTr("&Merge another library into this…"); enabled: window.hasSelection && !Libraries.busy; onTriggered: mergeDialog.open() }
         }
         Menu {
@@ -214,13 +220,21 @@ ApplicationWindow {
         function onErrorOccurred(message) { window.showError(message) }
     }
     Connections {
+        target: CompoundImport
+        function onErrorOccurred(message) { window.showError(message) }
+        function onImported(key, message, details) {
+            window.page = ""
+            Libraries.selectLibrary(key)
+            window.showInfo(message, details)
+        }
+    }
+    Connections {
         target: Builder
         function onErrorOccurred(message) { window.showError(message) }
         function onCommitted(key, message) {
             window.page = ""
             Libraries.selectLibrary(key)
-            infoDialog.text = message
-            infoDialog.open()
+            window.showInfo(message, "")
         }
     }
     Connections {
@@ -231,7 +245,7 @@ ApplicationWindow {
             window.commitAfterCreate = false
         }
         function onErrorOccurred(message) { window.showError(message); window.commitAfterCreate = false }
-        function onInfoMessage(message) { infoDialog.text = message; infoDialog.open() }
+        function onInfoMessage(message) { window.showInfo(message, "") }
         function onSelectedChanged() {
             if (window.hasSelection && !Libraries.selected.isTemp && Libraries.selected.path)
                 window.addRecent(Libraries.selected.path)
@@ -333,6 +347,8 @@ ApplicationWindow {
         buttons: MessageDialog.Ok | MessageDialog.Cancel
         onButtonClicked: (button, role) => { if (button === MessageDialog.Ok) Libraries.mergeIntoSelected(source) }
     }
+
+    ImportCompoundsDialog { id: importCompoundsDialog }
 
     Dialog {
         id: renameDialog

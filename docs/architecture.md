@@ -12,6 +12,7 @@ src/libviz/
     readers/mzml_reader.py streaming MS2 reader (lxml), decodes only kept scans
     readers/mzml_db.py   parsed mzML database (MSIAnalyzer's raw schema), MS2 matching + EIC (ADR 8)
     builder.py            target list + mzML -> candidate spectra -> commit (ADR 4)
+    compound_import.py    Excel/CSV table -> checked compound rows -> library (ADR 10)
     writers/msp_writer.py streaming MSP export (ADR 5)
     similarity.py         greedy (modified) cosine, peak-list parsing (ADR 6)
     utils/                MSP parsing, mass/adduct maths, logging
@@ -25,6 +26,7 @@ src/libviz/
     builder_bridge.py  `Builder`: setup / run / review / commit (ADR 4)
     dict_model.py      list model with in-place row updates
     search_bridge.py   `Search`: spectral search across open libraries (ADR 6)
+    compound_import_bridge.py `CompoundImport`: Library › Import compounds… (ADR 10)
     qml/Main.qml       window, menubar, sidebar, status bar, dialogs
     qml/Style/         Theme singleton (light/dark tokens)
     qml/Views/         pages and panels

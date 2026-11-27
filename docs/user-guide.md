@@ -15,6 +15,7 @@ to close it.
 | Rename | Library › Rename… | The name is stored inside the file. |
 | Export as MSP | File › Export as MSP… (Ctrl+E) | Every spectrum, with its metadata. |
 | Merge | Library › Merge another library into this… | Copies compounds and spectra from a `.db`; identical spectra are skipped. |
+| Import compounds | Library › Import compounds (Excel/CSV)… | Compounds without spectra, from an Excel sheet or a CSV/TSV. See below. |
 | Theme | View › Dark theme | Remembered across sessions. |
 
 Closing an unsaved import, or quitting with one open, asks before
@@ -51,7 +52,8 @@ The **Overview** tab of a library shows:
 - distributions by polarity, adduct, CE and peaks per spectrum
 - a precursor m/z histogram
 - **Quality checks**: compounds without spectra or SMILES, spectra with
-  ≤ 2 peaks or without polarity, and duplicate spectra. *Show* filters the
+  ≤ 2 peaks or without polarity, duplicate spectra, and compounds with an
+  invalid or missing InChIKey. *Show* filters the
   compound table to the affected compounds. Clear the filter with ✕ or
   *Clear*.
 
@@ -100,6 +102,38 @@ similarity and the number of matched peaks.
 Changes are written to the library immediately and can't be undone. Use
 *Save as* first if you want to keep the original.
 
+## Importing compounds (Excel/CSV)
+
+*Library › Import compounds (Excel/CSV)…* adds compounds **without
+spectra** to the selected library (create an empty one first with *File ›
+New library…* if needed). Their spectra come later from the builder
+(*Choose compounds…*, below).
+
+1. Choose an `.xlsx` or a CSV/TSV/`;` file, and the sheet for Excel. The
+   header is the first non-empty row of the sheet. One table per sheet: side
+   by side tables are read as one.
+2. Check the column of each field: name, formula, exact mass, InChIKey,
+   SMILES, PubChem CID. They are guessed from the headers (English or
+   Italian, e.g. `Nome`, `Massa`, `PubChem CID`); *(not used)* leaves one out.
+3. The preview shows every row:
+   - ✓ imported as is.
+   - ⚠ imported with a warning:
+     - The InChIKey is missing or invalid. The cell's value becomes the
+       compound's key (e.g. `TRYPT-CA`), or `NOKEY:<name>` when the cell is
+       empty. These compounds appear under the quality check *invalid or
+       missing InChIKey*. MSP export writes no `INCHIKEY` line for them.
+     - The mass differs from the formula's by more than 0.01 Da. The
+       formula's mass is used (an average MW column, for example, warns on
+       every row).
+     - The formula is invalid or missing: the mass is used.
+   - ✕ not imported: no name, no formula and no mass, or the same key as an
+     earlier row.
+
+   Formulas may contain `D` for deuterium (`C24H36D4O5`). Spaces and
+   invisible characters pasted from Excel are ignored.
+4. *Import*. A compound already in the library (same key) is not added
+   again, but its missing SMILES or PubChem CID is filled in.
+
 ## Building a library from mzML
 
 *Library › Build from mzML…* (Ctrl+B), or the button on the start page.
@@ -122,6 +156,11 @@ Changes are written to the library immediately and can't be undone. Use
    an adduct, and click *Add* (repeat for more; ✕ removes one). These targets
    have no identity while you explore. You choose the compound when you add
    them to a library (step 5).
+
+   **Or from a library:** *Choose compounds…* lists the compounds of an open
+   library (filter by name, formula or InChIKey; *All*/*None* act on the
+   listed ones). The checked ones become targets with the default adducts,
+   and their spectra are added to the same compounds.
 2. **mzML files:** centroided MS2 (convert with msconvert,
    `peakPicking true 1-`). DDA, DIA and imaging runs all work.
    Each file is parsed once into `file.mzML.db` next to it, or into the user

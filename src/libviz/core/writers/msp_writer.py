@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
+from libviz.core.builder import INCHIKEY_RE
 from libviz.core.readers.msp_reader import RT_KEYS
 
 BATCH = 2000
@@ -26,7 +27,7 @@ def _entry(row, metadata: list[tuple[str, str]]) -> str:
         lines.append(f"PRECURSORTYPE: {adduct}")
     if formula:
         lines.append(f"FORMULA: {formula}")
-    if inchikey:
+    if inchikey and INCHIKEY_RE.match(inchikey):  # not a stand-in key (ADR 10)
         lines.append(f"INCHIKEY: {inchikey}")
     if smiles:
         lines.append(f"SMILES: {smiles}")
