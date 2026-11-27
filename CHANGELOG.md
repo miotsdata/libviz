@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-11-27
 
 ### Added
 - *Library › Import compounds (Excel/CSV)…*: add compounds without spectra from an `.xlsx` sheet or a CSV/TSV, with a column mapping, a preview and per-row warnings (ADR 10). A missing or invalid InChIKey is accepted with a warning; a mass that differs from the formula by more than 0.01 Da is flagged.
